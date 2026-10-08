@@ -1,0 +1,71 @@
+Operations research (OR) is the discipline of making decisions with mathematical models. The phrase is old — it comes from the analysis groups set up in Britain and the United States during the Second World War to study radar deployment, convoy sizing and bombing patterns — but the activity it names is now everywhere: in the software that routes parcel vans, sets airline fares, schedules nurses, and decides which power stations run tomorrow morning.
+
+These notes are about those *applications*. Each lecture picks one decision problem that organisations actually face and works through it end to end.
+
+## The modelling cycle
+
+Every application in these notes follows the same loop.
+
+1. **Describe the decision.** Who decides what, how often, and under which rules? A depot manager choosing tomorrow's van routes faces a different problem from a planner choosing where to build depots for the next ten years, even though both are "logistics".
+2. **Formulate a model.** Name the *decision variables* (what you control), the *objective* (what you are trying to minimise or maximise), and the *constraints* (what must hold). The output is a precise mathematical statement.
+3. **Solve it.** Choose an algorithm — exact, heuristic, or simulation — appropriate to the model's structure and size.
+4. **Interpret and validate.** Check that the answer makes sense to the people who will use it. Ask what the model left out. Usually you return to step 1.
+
+<Definition name="Optimisation model">
+An optimisation model has the form
+$$
+\min_{x \in X} \; f(x) \quad \text{subject to} \quad g_i(x) \le 0, \; i = 1, \dots, m,
+$$
+where $x$ is the vector of decision variables, $X$ is its domain (for example $\mathbb{R}^n_{\ge 0}$ or $\mathbb{Z}^n$), $f$ is the objective, and the $g_i$ are constraints. A point satisfying every constraint is **feasible**; a feasible point with the smallest objective value is **optimal**.
+</Definition>
+
+Step 2 is where most of the craft lies. The same real problem can usually be written in several mathematically equivalent ways, and they are not equally easy to solve. You will see this repeatedly — for example in the "weak" and "strong" formulations of facility location.
+
+## The toolkit
+
+OR draws on a fairly small set of model classes. Most applications in these notes use one or two of them.
+
+| Model class | Variables | Typical applications | Workhorse methods |
+| --- | --- | --- | --- |
+| Linear programming (LP) | continuous | transportation, blending, production planning | simplex, interior point |
+| Integer / mixed-integer programming (MIP) | some integer or binary | facility location, scheduling, routing | branch and bound, cutting planes |
+| Network flows | flows on arcs | transportation, assignment, shortest paths | specialised simplex, combinatorial algorithms |
+| Nonlinear / quadratic programming | continuous | portfolio selection, pricing | interior point, gradient methods |
+| Stochastic models | random parameters | inventory, revenue management | newsvendor analysis, dynamic programming, sampling |
+| Queueing theory | arrival and service processes | call centres, hospitals, networks | closed-form formulas, simulation |
+| Heuristics and metaheuristics | any | large routing and scheduling instances | construction, local search, tabu, genetic algorithms |
+
+<Remark>
+Linear programming deserves special mention because it underpins much of the rest. Branch and bound for integer programs solves a sequence of LPs; column generation solves LPs with too many variables to write down; and the dual of an LP gives *prices* — shadow prices of resources — that are often as useful to a decision-maker as the solution itself.
+</Remark>
+
+## Linear programming in one page
+
+Since LP recurs throughout, here is the minimum we will rely on.
+
+A linear program in standard inequality form is
+$$
+\min_{x} \; c^\top x \quad \text{s.t.} \quad Ax \ge b, \; x \ge 0 .
+$$
+Its **dual** is
+$$
+\max_{y} \; b^\top y \quad \text{s.t.} \quad A^\top y \le c, \; y \ge 0 .
+$$
+
+<Result name="LP duality">
+If either problem has a finite optimum, so does the other, and the optimal values are equal: $c^\top x^* = b^\top y^*$. Moreover $x^*$ and $y^*$ satisfy **complementary slackness**: $y_i^* > 0$ only if constraint $i$ is tight, and $x_j^* > 0$ only if dual constraint $j$ is tight.
+</Result>
+
+The economic reading is what makes duality useful in applications. The dual variable $y_i^*$ is the rate at which the optimal cost changes as the right-hand side $b_i$ changes — the **shadow price** of constraint $i$. If constraint $i$ says "meet demand at market $i$", then $y_i^*$ is the marginal cost of serving one more unit there. We will use this interpretation in the transportation problem, in electricity markets (where shadow prices *are* the market prices), and in airline revenue management (where they become bid prices).
+
+## How these notes are organised
+
+The lectures are grouped by application area rather than by technique, because that is how problems arrive in practice: nobody hands you "an integer program", they hand you a depot and a fleet of vans. Each lecture follows roughly the same structure:
+
+- **The decision** — the setting and what is being chosen.
+- **Formulation** — the model, with every variable and constraint explained.
+- **Solution methods** — how the model is solved, and what makes it easy or hard.
+- **A worked example** — small enough to check by hand.
+- **Extensions** — what real deployments add on top.
+
+Use the panel on the left to move between lectures; within a lecture it also lists the sections.

@@ -1,0 +1,131 @@
+A company makes a product at several plants and sells it in several markets. Each plant has a limited capacity, each market has a demand that must be met, and shipping one unit from a given plant to a given market has a known cost. How much should each plant send to each market?
+
+This is the **transportation problem**. It is one of the oldest models in OR and still one of the most useful: it is the building block inside distribution planning, it is the simplest example of a network-flow problem, and its dual has a clean economic interpretation.
+
+## The decision
+
+We have $m$ supply points (plants, warehouses, ports) indexed by $i$ and $n$ demand points (markets, stores, customers) indexed by $j$.
+
+- Supply point $i$ can ship at most $s_i$ units.
+- Demand point $j$ requires $d_j$ units.
+- Shipping one unit along route $(i, j)$ costs $c_{ij}$.
+
+The decision is the shipment plan: how many units travel along each route. Costs are assumed to be linear in quantity — no fixed charges per route, no volume discounts. (Relaxing that assumption turns the LP into a MIP; see the extensions.)
+
+## Formulation
+
+Let $x_{ij} \ge 0$ be the quantity shipped from $i$ to $j$.
+
+$$
+\begin{aligned}
+\min_{x} \quad & \sum_{i=1}^{m} \sum_{j=1}^{n} c_{ij}\, x_{ij} \\
+\text{s.t.} \quad & \sum_{j=1}^{n} x_{ij} \le s_i, && i = 1, \dots, m \quad \text{(capacity)} \\
+& \sum_{i=1}^{m} x_{ij} \ge d_j, && j = 1, \dots, n \quad \text{(demand)} \\
+& x_{ij} \ge 0 .
+\end{aligned}
+$$
+
+The model is feasible exactly when total supply covers total demand, $\sum_i s_i \ge \sum_j d_j$.
+
+<Definition name="Balanced transportation problem">
+A transportation problem is **balanced** if $\sum_i s_i = \sum_j d_j$. In that case every constraint holds with equality at any feasible point. Any problem can be balanced by adding a *dummy demand point* that absorbs the surplus supply at zero cost; units sent to it represent unused capacity.
+</Definition>
+
+### Structure
+
+The constraint matrix has a very particular form: every variable $x_{ij}$ appears in exactly two constraints — the capacity row of $i$ and the demand row of $j$ — each with coefficient $1$. Equivalently, the problem is a flow problem on a bipartite graph with supply nodes on one side, demand nodes on the other, and an arc for every route.
+
+<Result name="Integrality">
+The constraint matrix of the transportation problem is **totally unimodular**: every square submatrix has determinant $0$, $+1$ or $-1$. Consequently, if all $s_i$ and $d_j$ are integers, every basic feasible solution — and in particular the solution returned by the simplex method — is integer.
+</Result>
+
+This matters in practice. If the units are trucks, containers or people, we need whole numbers, and integer programming is in general much harder than LP. For the transportation problem we get integrality for free.
+
+## Solution methods
+
+Any LP solver handles transportation problems of realistic size in well under a second. Historically, though, the structure motivated a specialised version of the simplex method that is still taught because it makes the dual visible.
+
+**Finding a starting solution.** In a balanced problem a basic feasible solution has at most $m + n - 1$ positive entries (one constraint is redundant, since supplies and demands sum to the same total). Simple rules produce one:
+
+- *North-west corner rule*: fill the table starting at the top-left cell, shipping as much as possible, and move right or down as rows and columns are exhausted. Ignores costs; easy to check.
+- *Least-cost rule*: repeatedly fill the cheapest remaining cell.
+- *Vogel's approximation*: for each row and column compute the gap between its two cheapest cells, and fill the cheapest cell in the row or column with the largest gap. Often close to optimal.
+
+**Testing optimality (MODI / u–v method).** Assign a potential $u_i$ to each supply row and $v_j$ to each demand column such that
+$$
+u_i + v_j = c_{ij} \quad \text{for every basic (used) cell } (i, j).
+$$
+There are $m + n$ unknowns and $m + n - 1$ equations, so fix one value (say $u_1 = 0$) and solve the rest. Then compute the **reduced cost** of each unused cell:
+$$
+\bar c_{ij} = c_{ij} - u_i - v_j .
+$$
+If every $\bar c_{ij} \ge 0$, the current plan is optimal. Otherwise, bring a cell with negative reduced cost into the solution by shifting flow around the unique cycle it forms with the basic cells, and repeat.
+
+The $u_i$ and $v_j$ are precisely the LP dual variables, and the optimality test is LP complementary slackness written out for this problem.
+
+## Worked example
+
+<Example name="Three plants, four markets">
+Supplies, demands and unit costs are:
+
+|  | $D_1$ | $D_2$ | $D_3$ | $D_4$ | Supply |
+| --- | --- | --- | --- | --- | --- |
+| $S_1$ | 8 | 6 | 10 | 9 | 120 |
+| $S_2$ | 9 | 12 | 13 | 7 | 80 |
+| $S_3$ | 14 | 9 | 16 | 5 | 100 |
+| **Demand** | 70 | 90 | 60 | 80 | 300 |
+
+Total supply equals total demand, so the problem is balanced. The optimal shipment plan is
+
+|  | $D_1$ | $D_2$ | $D_3$ | $D_4$ |
+| --- | --- | --- | --- | --- |
+| $S_1$ | · | 70 | 50 | · |
+| $S_2$ | 70 | · | 10 | · |
+| $S_3$ | · | 20 | · | 80 |
+
+with total cost
+$$
+70 \cdot 6 + 50 \cdot 10 + 70 \cdot 9 + 10 \cdot 13 + 20 \cdot 9 + 80 \cdot 5 = 2260 .
+$$
+
+**Verifying optimality.** The six used cells give the equations $u_i + v_j = c_{ij}$. Setting $u_1 = 0$:
+
+- from $(1,2)$ and $(1,3)$: $v_2 = 6$, $v_3 = 10$;
+- from $(2,3)$: $u_2 = 3$; then $(2,1)$ gives $v_1 = 6$;
+- from $(3,2)$: $u_3 = 3$; then $(3,4)$ gives $v_4 = 2$.
+
+The reduced costs $\bar c_{ij} = c_{ij} - u_i - v_j$ of the unused cells are
+
+|  | $D_1$ | $D_2$ | $D_3$ | $D_4$ |
+| --- | --- | --- | --- | --- |
+| $S_1$ | 2 | · | · | 7 |
+| $S_2$ | · | 3 | · | 2 |
+| $S_3$ | 5 | · | 3 | · |
+
+All are strictly positive, so the plan is optimal — and, because none is zero, it is the *unique* optimum.
+</Example>
+
+Notice that the optimum is not greedy. Market $D_1$ is cheapest to serve from $S_1$ (cost 8), yet it is served entirely from $S_2$ (cost 9). Plant $S_1$ is more valuable sending its limited capacity to $D_2$ and $D_3$, where its cost advantage over the alternatives is larger.
+
+## Reading the dual
+
+In the balanced problem the potentials are only determined up to a constant (adding $k$ to every $u_i$ and subtracting it from every $v_j$ changes nothing), so their *differences* carry the meaning.
+
+- **Reduced costs** price the routes not used. Route $S_1 \to D_4$ has $\bar c_{14} = 7$: its unit cost would have to fall from 9 to 2 before it would be worth using. Route $S_1 \to D_1$, at $\bar c_{11} = 2$, is the nearest to entering the plan — useful to know if rates are renegotiated.
+- **Supply potentials** price capacity. Here $u_2 - u_1 = u_3 - u_1 = 3$: an extra unit of capacity at $S_1$ (with one unit less at $S_2$ or $S_3$) would lower total cost by 3. If the company could expand one plant, the dual says to expand $S_1$.
+- **Demand potentials** price markets. Serving one extra unit at $D_j$, using an extra unit of supply at $S_i$, costs $u_i + v_j$. One more unit at $D_3$ made at $S_1$ costs $0 + 10 = 10$ at the margin.
+
+<Remark>
+Shadow prices are valid only for small changes. Large changes in supply or demand alter which routes are used, and with them the potentials. LP sensitivity analysis reports the range over which each price holds.
+</Remark>
+
+## Extensions
+
+The transportation model is deliberately minimal. Real distribution planning typically adds:
+
+- **Transshipment.** Goods may pass through intermediate warehouses or cross-docks. The model becomes a **minimum-cost network flow** problem on a general graph, with flow conservation at each intermediate node. It keeps total unimodularity, so integrality still comes for free.
+- **Multiple products.** Several commodities share arc or plant capacity. The coupling constraints break the network structure, and integrality is no longer automatic.
+- **Fixed charges.** Opening a route or a lane costs money regardless of volume. This needs binary variables, and leads directly to the facility location models.
+- **The assignment problem.** The special case $m = n$ with all $s_i = d_j = 1$: assign $n$ workers to $n$ jobs at minimum total cost. It has its own efficient algorithm (the Hungarian method) and appears inside many scheduling problems.
+
+Further reading: the transportation problem is treated in every introductory OR text; see for example Hillier and Lieberman, *Introduction to Operations Research*, or Ahuja, Magnanti and Orlin, *Network Flows*, for the network-flow view.
