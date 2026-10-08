@@ -1,0 +1,128 @@
+A hospital, a contact centre, a police force or an airport has to have the right number of people at work at every hour of every day. Too few and service collapses; too many and the wage bill — usually the largest controllable cost in a service organisation — balloons. Yet staff cannot be switched on and off by the hour: they work shifts of fixed length, need days off, and are governed by labour law and union agreements. How many people should be employed, and on which shifts?
+
+This is **staff scheduling** (or workforce scheduling). Its core is one of the cleanest integer programs in OR: a **set covering** model in which each possible shift pattern is a column and each period's staffing requirement is a row. George Dantzig used exactly this formulation in 1954 for staffing toll booths, and it remains the backbone of commercial rostering software.
+
+## The decision
+
+Split the planning horizon (a day, a week) into periods indexed by $t = 1, \dots, T$ — hours, half-hours, or whole days.
+
+- In period $t$ at least $r_t$ staff must be on duty. These **staffing requirements** are taken as given here; they come from demand forecasts and, for queueing systems such as call centres, from a queueing model.
+- A **shift** (or shift pattern) $j = 1, \dots, n$ is a feasible working schedule: for example "08:00–16:00 with a break at 12:00", or "work Monday to Friday, off Saturday and Sunday". The set of shifts encodes all the rules about what a legal working pattern looks like.
+- Assigning one person to shift $j$ costs $c_j$ — wages plus any premiums for nights or weekends.
+
+The decision is how many people to assign to each shift. Note what is *not* decided here: which named individual works which shift. That comes later, in rostering.
+
+## Formulation
+
+Let $a_{tj} = 1$ if shift $j$ covers period $t$ and $a_{tj} = 0$ otherwise. The matrix $A = (a_{tj})$ is built once, by listing every allowed shift. Let $x_j$ be the number of people assigned to shift $j$.
+
+$$
+\begin{aligned}
+\min_{x} \quad & \sum_{j=1}^{n} c_j\, x_j \\
+\text{s.t.} \quad & \sum_{j=1}^{n} a_{tj}\, x_j \ge r_t, && t = 1, \dots, T \quad \text{(cover)} \\
+& x_j \in \mathbb{Z}_{\ge 0}, && j = 1, \dots, n .
+\end{aligned}
+$$
+
+The objective is the total cost of the assigned shifts. Each cover constraint says that the people whose shift includes period $t$ number at least $r_t$. The inequality is deliberate: over-cover is allowed (it is unavoidable when shifts are long and requirements fluctuate), and the cost of it is captured by the objective. Integrality is essential — people come in whole units.
+
+<Definition name="Set covering">
+An integer program $\min \{ c^\top x : Ax \ge r, \; x \in \mathbb{Z}^n_{\ge 0} \}$ with a 0–1 matrix $A$ is a **(generalised) set covering problem**. Each column is a subset of the rows (the periods a shift covers), and we choose subsets, with repetition, so that row $t$ is covered at least $r_t$ times at minimum cost.
+</Definition>
+
+The modelling power lives in the columns. Breaks, maximum shift lengths, split shifts and start-time restrictions are all handled by deciding which patterns are allowed to exist, not by adding constraints. The price is that the number of columns can be enormous: with 15-minute periods, several shift lengths, start times and break windows, a single day can easily generate thousands of patterns.
+
+## Cyclic days-off scheduling
+
+The simplest non-trivial instance works at the level of days. A facility runs seven days a week; on day $t$ it needs $r_t$ full-time staff. Each employee works **five consecutive days and then has two consecutive days off**, and this pattern repeats every week. How many employees are needed?
+
+There are exactly seven shift patterns, one for each possible first working day. Let $x_j$ be the number of employees whose working week starts on day $j$ (with $j = 1$ for Monday, $\dots$, $j = 7$ for Sunday). An employee starting on day $j$ works days $j, j+1, \dots, j+4$, counted cyclically, so the people at work on day $t$ are those who started on $t$ or on any of the four previous days:
+
+$$
+\begin{aligned}
+\min_{x} \quad & \sum_{j=1}^{7} x_j \\
+\text{s.t.} \quad & \sum_{k=0}^{4} x_{t-k} \ge r_t, && t = 1, \dots, 7 \\
+& x_j \in \mathbb{Z}_{\ge 0},
+\end{aligned}
+$$
+
+where indices are taken modulo 7 (so $x_0 = x_7$, $x_{-1} = x_6$, and so on). All employees cost the same, so the objective simply counts heads. Every column of the constraint matrix has five ones in cyclically consecutive rows.
+
+A simple lower bound comes from counting person-days: each employee supplies five working days a week, so at least $\lceil \sum_t r_t / 5 \rceil$ employees are needed. This bound ignores *when* the days are needed and is often weak.
+
+## Solution methods
+
+**Why integrality matters here.** Unlike the transportation problem, the covering matrix of a general shift scheduling problem is not totally unimodular, and the LP relaxation can have fractional vertices. Rounding a fractional LP solution *up* always gives a feasible schedule (more people never violates a cover constraint), but it can be far from optimal; rounding *down* is usually infeasible.
+
+<Result name="Consecutive ones">
+If every shift covers a block of *consecutive* periods with no wrap-around — as in a single day with one-block shifts and no breaks — the cover matrix has the **consecutive-ones property** in its columns, is totally unimodular, and the LP relaxation has an integer optimum. Cyclic patterns (that wrap around the week) and shifts with breaks destroy this property.
+</Result>
+
+**Branch and bound.** In practice, MIP solvers solve days-off problems instantly and shift-level problems with thousands of columns in seconds. The LP relaxation is usually tight — the optimal integer value is often the LP value rounded up — so branch and bound has little work to do.
+
+**Column generation.** When the set of legal patterns is too large to enumerate (long horizons, complex rules), solve the LP over a restricted set of columns, use the dual prices $\pi_t$ on the cover constraints to search for a pattern with negative reduced cost $c_j - \sum_t a_{tj} \pi_t$, add it, and repeat. The pricing problem is typically a shortest-path problem over a graph whose paths are legal patterns. Embedded in branch and bound this becomes **branch and price**, the standard method for large crew and nurse rostering problems.
+
+## Worked example
+
+<Example name="Seven-day facility">
+A facility needs the following numbers of full-time staff on each day of the week:
+
+| | Mon | Tue | Wed | Thu | Fri | Sat | Sun |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Required $r_t$ | 17 | 13 | 15 | 19 | 14 | 16 | 11 |
+
+The total requirement is 105 person-days, so the counting bound says at least $\lceil 105/5 \rceil = 21$ employees.
+
+**LP relaxation.** Solving the LP relaxation gives an optimal value of $67/3 \approx 22.33$; one optimal solution is $x = (6\tfrac13,\, 5,\, \tfrac13,\, 7\tfrac13,\, 0,\, 3\tfrac13,\, 0)$. Since the number of employees is an integer, at least $\lceil 22.33 \rceil = 23$ are needed. Rounding this LP solution up gives $7 + 5 + 1 + 8 + 0 + 4 + 0 = 25$ employees — feasible, but two more than necessary.
+
+**Integer optimum.** Solving the integer program gives 23 employees, matching the LP bound. One optimal assignment is
+
+| Start day | Mon | Tue | Wed | Thu | Fri | Sat | Sun |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| $x_j$ | 7 | 5 | 1 | 8 | 0 | 2 | 0 |
+| On duty | 17 | 14 | 15 | 21 | 21 | 16 | 11 |
+| Surplus | 0 | 1 | 0 | 2 | 7 | 0 | 0 |
+
+So 7 people work Monday–Friday, 5 work Tuesday–Saturday, 1 works Wednesday–Sunday, 8 work Thursday–Monday and 2 work Saturday–Wednesday. The surplus totals 10 person-days, which is exactly $5 \cdot 23 - 105$.
+
+**A certificate of optimality.** The LP dual gives a short proof that 23 cannot be beaten. Look at the four days Monday, Wednesday, Thursday and Saturday. The other three days — Tuesday, Friday and Sunday — are pairwise non-adjacent in the weekly cycle, so every pair of consecutive days off contains at least one of the four chosen days. Hence every one of the seven patterns covers *at most three* of them. Summing the four cover constraints therefore gives
+$$
+3 \sum_{j} x_j \;\ge\; r_{\text{Mon}} + r_{\text{Wed}} + r_{\text{Thu}} + r_{\text{Sat}} = 17 + 15 + 19 + 16 = 67,
+$$
+so $\sum_j x_j \ge 67/3$, and hence at least 23 employees. This is exactly the LP dual solution: price $\tfrac13$ on each of those four days and $0$ on the others.
+</Example>
+
+The optimum is far from unique: there are 383 different integer vectors $x$ that use exactly 23 employees. That freedom is valuable. A planner can use it to pursue secondary goals — spreading the surplus over the busiest days, or giving more people weekends off — without hiring anyone extra, for instance by re-optimising with a secondary objective and the head count fixed at 23.
+
+<Remark>
+The surplus of 7 on Friday is not waste in any avoidable sense: given the five-on, two-off rule and the Thursday peak, no 23-person schedule can match every day exactly. The counting bound of 21 assumed perfect matching, which the pattern structure forbids.
+</Remark>
+
+## LP relaxation and integrality
+
+The example illustrates the general picture. For covering problems the LP relaxation provides:
+
+- a **lower bound** on the optimal cost, which is often within one unit of the integer optimum in staffing problems;
+- **dual prices** $\pi_t$ on the requirements, which say which periods drive the head count. Here only Monday, Wednesday, Thursday and Saturday have positive prices: lowering Friday's requirement from 14 to, say, 10 would not save anyone, while lowering any of the priced days by three would save one employee;
+- a **starting point** for branch and bound or for simple rounding heuristics.
+
+What the LP does not provide is a usable schedule: $\tfrac13$ of a person cannot start on Wednesday. For the small problems in these notes an MIP solver closes the gap instantly; for large rostering problems the strength of the LP bound is what makes branch and price practical.
+
+## Extensions
+
+Real workforce planning is rarely a single model. It is usually a **pipeline**, with each stage feeding the next:
+
+1. **Forecasting.** Predict demand (calls, patients, passengers) per period, typically 15 or 30 minutes, weeks ahead.
+2. **Staffing requirements.** Convert forecast demand into the number of staff $r_t$ needed in each period to meet a service target. For call centres this is a queueing calculation (see the call-centre lecture); for wards it may be a nurse-to-patient ratio.
+3. **Shift scheduling.** Choose how many people work each shift pattern to cover the $r_t$ at minimum cost — the set covering model above.
+4. **Rostering.** Assign named individuals to the shifts, respecting each person's contract, skills, leave and preferences.
+
+Splitting the problem this way keeps each stage tractable, at the cost of some optimality: a requirement computed period by period in stage 2 ignores that a shift scheduled in stage 3 will inevitably over-cover some periods.
+
+**Nurse rostering.** The best-studied rostering problem. Variables are typically binary, $y_{ist} = 1$ if nurse $i$ works shift $s$ on day $t$. Hard constraints include at most one shift per day, minimum rest between shifts (no early shift straight after a night), a maximum number of consecutive working days, contracted hours over the roster period, and skill mix (each shift needs at least one senior nurse).
+
+**Preferences and soft constraints.** Many rules are desirable rather than mandatory: requested days off, avoiding isolated working days, fair distribution of weekends and nights. These are modelled as **soft constraints**: introduce a slack variable $s_k \ge 0$ for the violation of rule $k$, and add a penalty $w_k s_k$ to the objective. The weights $w_k$ express the organisation's priorities and are, in practice, tuned with the people who will live with the roster. Understaffing itself can be made soft — with a high penalty — so that the model always returns a schedule and reports where it falls short.
+
+**Fairness and self-rostering.** Because rosters shape people's lives, acceptance matters as much as cost. Common approaches let staff bid for shifts and then use optimisation to repair the result, or add equity constraints bounding the difference between the most and least favoured employees.
+
+Further reading: Ernst, Jiang, Krishnamoorthy and Sier, "Staff scheduling and rostering: a review of applications, methods and models", *European Journal of Operational Research* (2004); Pinedo, *Planning and Scheduling in Manufacturing and Services*, for shift scheduling and the days-off problem.

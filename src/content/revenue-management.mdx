@@ -1,0 +1,149 @@
+An airline flight has a fixed number of seats, and an empty seat at departure is worth nothing. The airline sells the same seat at several prices: cheap fares with restrictions, bought weeks in advance by leisure travellers, and expensive flexible fares, bought close to departure by business travellers. If it sells too many cheap seats it turns away high-paying customers later; if it holds back too many, the plane leaves with empty seats. How many seats should be kept for the late, high-fare demand?
+
+This is **revenue management** (RM), also called yield management. It grew up in the airline industry after deregulation and is now used wherever capacity is fixed and perishable and customers can be segmented: hotels, car rental, rail, cruises, event tickets, cloud computing. RM does not usually set the prices themselves — those come from marketing — but controls *availability*: which fare classes are open for sale at each moment.
+
+## The decision
+
+We start with the simplest case and build up.
+
+- A single flight leg has $C$ seats.
+- There are two **fare classes**: a full fare $p_1$ and a discount fare $p_2 \lt p_1$.
+- Demand for each class is random: $D_1$ for the full fare, $D_2$ for the discount fare.
+- Discount customers book first; all discount demand arrives before any full-fare demand. Customers who are refused their class simply leave (no "buy-up" to the other class).
+
+The decision is a **protection level** $y$: the number of seats reserved for full-fare customers. Equivalently, the **booking limit** for the discount class is $C - y$. Discount bookings are accepted until either the discount demand runs out or $C - y$ seats have been sold; full-fare customers can then buy any remaining seat.
+
+## Littlewood's rule
+
+The optimal protection level comes from a marginal argument, first given by Littlewood in 1972 for BOAC (a predecessor of British Airways).
+
+Suppose $y$ seats are currently protected and consider reducing the protection by one seat — that is, selling one more seat to a discount customer who is asking for it now. Selling gains $p_2$ for certain. Protecting the seat instead gains $p_1$, but only if full-fare demand turns out to be large enough to use it, which happens when $D_1 \ge y$. So the expected value of the $y$-th protected seat is $p_1 P(D_1 \ge y)$, and it is worth protecting as long as this exceeds $p_2$.
+
+Since $P(D_1 \ge y)$ decreases in $y$, the optimal protection level is the point where the two values cross.
+
+<Result name="Littlewood's rule">
+The optimal protection level for the full-fare class is the largest $y$ such that
+$$
+p_1 \, P(D_1 \ge y) \;\ge\; p_2 .
+$$
+If $D_1$ has a continuous distribution function $F_1$, this is
+$$
+y^* = F_1^{-1}\!\left( 1 - \frac{p_2}{p_1} \right),
+$$
+truncated to the interval $[0, C]$. The discount booking limit is $C - y^*$.
+</Result>
+
+Note what does *not* appear: the discount demand $D_2$. As long as discount demand comes first, its distribution does not affect the optimal protection level — only the high-fare demand and the fare ratio do. The rule is a newsvendor solution: protecting a seat that goes unused "overstocks" at cost $p_2$, and failing to protect a seat that a full-fare customer would have bought "understocks" at cost $p_1 - p_2$, giving the critical ratio $(p_1 - p_2)/p_1 = 1 - p_2/p_1$.
+
+## Worked example: two fare classes
+
+<Example name="Littlewood with normal demand">
+A flight has $C = 150$ seats. The full fare is $p_1 = 400$ and the discount fare is $p_2 = 150$. Full-fare demand is approximately normal with mean 60 and standard deviation 20.
+
+The fare ratio is $p_2/p_1 = 0.375$, so we need the $1 - 0.375 = 0.625$ quantile of $D_1$. The standard normal $0.625$ quantile is $z = 0.3186$, giving
+$$
+y^* = 60 + 0.3186 \times 20 = 66.37 .
+$$
+To choose an integer, check the rule directly: $P(D_1 \ge 66) = 0.382 \ge 0.375$ but $P(D_1 \ge 67) = 0.363 \lt 0.375$. So the airline protects **66 seats** for full-fare passengers and sets a discount booking limit of $150 - 66 = 84$.
+
+Note that the protection level is *above* mean full-fare demand. Because a full fare is worth more than twice a discount fare, it pays to err on the side of protecting too many seats.
+
+To see the value of the policy, suppose discount demand is normal with mean 130 and standard deviation 30, so that discount customers alone could nearly fill the plane. In a simulation of 400,000 flights (with demands rounded to integers), protecting 66 seats yields expected revenue of about 34,400, while selling first-come first-served with no protection yields about 27,700 — a 24% gain from a single number. The revenue curve is flat near the optimum: protecting 60 seats gives about 34,300.
+</Example>
+
+## Several fare classes: EMSR-b
+
+With $k \gt 2$ fare classes $p_1 \gt p_2 \gt \dots \gt p_k$, booked in order from lowest to highest, the exact optimal protection levels can be computed by dynamic programming. In practice airlines long used the simpler **EMSR** (expected marginal seat revenue) heuristics due to Belobaba. The most widely used variant, **EMSR-b**, applies Littlewood's rule repeatedly, each time aggregating all the higher classes into a single artificial class.
+
+To set the protection level $y_j$ for classes $1, \dots, j$ against class $j + 1$:
+
+1. Aggregate demand: $\bar D_j = \sum_{i=1}^{j} D_i$. For independent normal demands, this has mean $\sum_{i \le j} \mu_i$ and variance $\sum_{i \le j} \sigma_i^2$.
+2. Compute the demand-weighted average fare $\bar p_j = \sum_{i \le j} p_i \mu_i \big/ \sum_{i \le j} \mu_i$.
+3. Apply Littlewood: $y_j$ solves $\bar p_j \, P(\bar D_j \ge y_j) = p_{j+1}$.
+
+<Example name="EMSR-b with three classes">
+A flight has 120 seats and three fares, 400, 250 and 150, with independent normal demands of means 30, 40, 60 and standard deviations 10, 12, 15.
+
+- *Protect class 1 against class 2.* Ratio $250/400 = 0.625$; $y_1 = 30 + 10\, \Phi^{-1}(0.375) = 30 - 3.19 = 26.8$, so protect 27 seats.
+- *Protect classes 1–2 against class 3.* Aggregate mean 70, standard deviation $\sqrt{10^2 + 12^2} = 15.62$, weighted fare $(400 \cdot 30 + 250 \cdot 40)/70 = 314.29$. Ratio $150/314.29 = 0.477$; $y_2 = 70 + 15.62\, \Phi^{-1}(0.523) = 70.9$, so protect 71 seats.
+
+The booking limits are therefore $120 - 71 = 49$ seats for class 3 and $120 - 27 = 93$ seats for classes 2 and 3 together. These limits are **nested**: a class-1 customer may take any seat, including those "protected" from lower classes.
+</Example>
+
+## Network revenue management
+
+Hub-and-spoke airlines sell **itineraries** (origin–destination products) that use several flight legs. A seat on leg A→B might go to a local A→B passenger or to a connecting A→C passenger who also needs a seat on B→C. Controlling each leg separately by fare ignores this: a high-fare connecting passenger may be worth less to the network than two local passengers whose legs they displace.
+
+The standard tool is the **deterministic linear program** (DLP). Index legs by $\ell$ with capacities $C_\ell$, and itinerary–fare products by $i$ with fare $p_i$ and expected demand $\mu_i$. Let $a_{\ell i} = 1$ if product $i$ uses leg $\ell$. The decision variable $x_i$ is the number of seats to allocate to product $i$.
+
+$$
+\begin{aligned}
+\max_{x} \quad & \sum_{i} p_i\, x_i \\
+\text{s.t.} \quad & \sum_{i} a_{\ell i}\, x_i \le C_\ell, && \text{for every leg } \ell \quad \text{(capacity)} \\
+& 0 \le x_i \le \mu_i, && \text{for every product } i \quad \text{(demand)} .
+\end{aligned}
+$$
+
+The objective is total revenue. The capacity constraints say that the products using a leg cannot exceed its seats. The demand constraints say that we cannot sell more of a product than its expected demand. Replacing random demand by its mean ignores uncertainty, so the DLP overestimates achievable revenue; its value lies in its dual.
+
+<Definition name="Bid price">
+The **bid price** $\pi_\ell$ of leg $\ell$ is the optimal dual variable of its capacity constraint in the DLP: the estimated marginal value of one more seat on that leg. A **bid-price control** accepts a request for product $i$ if and only if its fare covers the bid prices of all the legs it uses,
+$$
+p_i \;\ge\; \sum_{\ell} a_{\ell i}\, \pi_\ell .
+$$
+</Definition>
+
+Bid prices turn a network problem into a simple, real-time decision rule. They are re-computed periodically during the booking horizon as seats sell and forecasts change.
+
+## Worked example: a two-leg network
+
+<Example name="Two legs, three itineraries">
+An airline flies A→B and B→C, each with 100 seats. It sells three itineraries:
+
+| Itinerary | Legs used | Fare | Expected demand |
+| --- | --- | --- | --- |
+| A→B (local) | A→B | 200 | 80 |
+| B→C (local) | B→C | 150 | 70 |
+| A→C (connecting) | A→B, B→C | 300 | 50 |
+
+The DLP is
+$$
+\begin{aligned}
+\max \quad & 200\, x_{AB} + 150\, x_{BC} + 300\, x_{AC} \\
+\text{s.t.} \quad & x_{AB} + x_{AC} \le 100, \\
+& x_{BC} + x_{AC} \le 100, \\
+& 0 \le x_{AB} \le 80, \quad 0 \le x_{BC} \le 70, \quad 0 \le x_{AC} \le 50 .
+\end{aligned}
+$$
+Its unique optimal solution is $x_{AB} = 70$, $x_{BC} = 70$, $x_{AC} = 30$, with revenue $70 \cdot 200 + 70 \cdot 150 + 30 \cdot 300 = 33{,}500$. Both legs are full.
+
+**Bid prices.** Complementary slackness pins down the duals. Product A→B is sold below its demand bound, so its fare equals its leg's bid price: $\pi_{AB} = 200$. Product A→C is also strictly inside its bounds, so $300 = \pi_{AB} + \pi_{BC}$, giving $\pi_{BC} = 100$. Product B→C is at its demand bound, and indeed its fare 150 exceeds $\pi_{BC} = 100$. Re-solving with one extra seat confirms the interpretation: revenue rises to 33,700 with 101 seats on A→B and to 33,600 with 101 seats on B→C.
+
+**Reading the solution.** The connecting itinerary has the highest fare, yet it receives only 30 of its 50 expected requests. Each A→C passenger displaces an A→B passenger worth 200 and uses a B→C seat worth 100 at the margin, so the network value of the seat pair is exactly 300 — A→C is the marginal product. Under bid-price control:
+
+- an A→B request at 200 is accepted (fare equals bid price 200);
+- a B→C request at 150 is accepted ($150 \ge 100$);
+- a discounted A→C request at 250 is rejected ($250 \lt 300$), even though 250 exceeds either local fare.
+</Example>
+
+<Remark>
+Bid prices are static approximations. As departure approaches and the remaining demand shrinks, the value of a seat falls, so bid prices should be re-computed from updated forecasts. Better approximations — randomised LPs, dynamic programming decompositions by leg — refine the bid prices, but the DLP remains the conceptual starting point.
+</Remark>
+
+## Overbooking
+
+Some booked passengers do not show up. Flying with seats that were sold but are empty loses revenue, so airlines accept more bookings than seats. The trade-off is the cost of **denied boarding**: compensation, rebooking and goodwill when more passengers show up than there are seats.
+
+A simple static model: each booking shows up independently with probability $q$, a showing passenger pays fare $p$, and each denied boarding costs $D \gt p$. Accepting one more booking beyond the current $b$ earns $p$ if that passenger shows up, but causes a denied boarding if, in addition, at least $C$ of the other $b$ passengers show up. Writing $S_b$ for the number of shows among $b$ bookings, the extra booking is worth accepting when
+$$
+q\, p \;\ge\; q\, D \, P(S_b \ge C), \qquad \text{that is,} \qquad P(S_b \ge C) \le \frac{p}{D} .
+$$
+For example, with $C = 100$ seats, show-up probability $q = 0.9$ and denied-boarding cost four times the fare ($p/D = 0.25$): $P(S_{108} \ge 100) = 0.236$, so a 109th booking is accepted, but $P(S_{109} \ge 100) = 0.340$, so a 110th is not. The overbooking limit is 109 bookings for 100 seats. In practice the overbooking limit and the fare-class protection levels are set jointly, by applying the protection levels to a "virtual" capacity above the physical one.
+
+## Extensions
+
+- **Dynamic programming.** The exact single-leg problem, with customers of different classes arriving in any order over time, is a dynamic program in the remaining capacity and time. Its value function differences are the exact time-varying bid prices.
+- **Customer choice.** The independent-demand assumption fails when customers buy up or down depending on what is open. Choice-based RM models demand with discrete choice models and decides which *sets* of fares to offer.
+- **Dynamic pricing.** Low-cost carriers, hotels and online retailers increasingly adjust prices directly rather than opening and closing fixed fare classes; the mathematics of protection levels and bid prices carries over.
+
+Further reading: Talluri and van Ryzin, *The Theory and Practice of Revenue Management*; Phillips, *Pricing and Revenue Optimization*.

@@ -53,6 +53,34 @@ export const parts: Part[] = [
       },
     ],
   },
+  {
+    title: "Services & Workforce",
+    lectures: [
+      {
+        slug: "staff-scheduling",
+        title: "Staff Scheduling",
+        summary:
+          "Covering staffing requirements with shifts at minimum cost: set covering, the cyclic days-off problem, and the pipeline from forecast to roster.",
+      },
+      {
+        slug: "call-centers",
+        title: "Call Centre Staffing",
+        summary:
+          "Sizing a call centre with the Erlang C queue, service-level targets, and the square-root staffing rule.",
+      },
+    ],
+  },
+  {
+    title: "Pricing & Finance",
+    lectures: [
+      {
+        slug: "revenue-management",
+        title: "Revenue Management",
+        summary:
+          "Deciding how many seats to protect for high-fare demand, from Littlewood's rule to network bid prices and overbooking.",
+      },
+    ],
+  },
 ];
 
 export interface NumberedLecture extends Lecture {
