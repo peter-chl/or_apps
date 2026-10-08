@@ -1,0 +1,165 @@
+After fuel, crew is typically one of an airline's largest operating costs. Every flight in the timetable needs a qualified cockpit and cabin crew, and crew members are bound by a thick book of rules — from aviation regulators, labour agreements and company policy — about how long they may work, how much rest they need, and where they must start and finish. Building crew schedules that cover every flight legally at minimum cost is a large combinatorial problem, and it is one of the great success stories of integer programming.
+
+Airlines split the problem into two stages. **Crew pairing** builds anonymous multi-day work patterns that cover the flights; **crew rostering** then assigns those patterns to named individuals. This lecture concentrates on pairing, which is a set partitioning problem with far too many columns to write down, solved by column generation.
+
+## The decision
+
+The input is the flight schedule for a planning period, typically a representative week or a full month, for one crew type (for example captains qualified on one aircraft family). Each scheduled flight is a **flight leg**: a single take-off and landing, with departure and arrival stations and times.
+
+Crew members are based at a **crew base** (or *domicile*), where they live. Their work is organised in three nested levels:
+
+- a **duty** (or duty period) is a sequence of legs flown in one working day, separated by short connections;
+- a **pairing** (or *trip*) is a sequence of duties, separated by overnight rests away from home, that starts and ends at the same crew base, typically one to five days long;
+- a **roster** (or *line*) is a sequence of pairings, separated by days off, that one person flies over a month.
+
+<Definition name="Legal pairing">
+A pairing is **legal** if it is a sequence of legs in which each leg departs from the station where the previous one arrived, it begins and ends at the same crew base, and it satisfies all applicable rules — minimum connection times, maximum flying time and maximum elapsed time per duty, minimum rest between duties, maximum number of landings, maximum days away, and so on.
+</Definition>
+
+Each legal pairing $p$ has a cost $c_p$. It is rarely a simple sum: crew are paid by formulas such as the maximum of the flying time, a fraction of the duty time and a daily guarantee, plus hotel and per-diem allowances for nights away. Such costs reward pairings that keep crew flying rather than waiting.
+
+The pairing decision is: which legal pairings should the airline use, so that every leg is flown by exactly one crew?
+
+## Formulation
+
+Let $L$ be the set of flight legs and $P$ the set of all legal pairings. The data are the costs $c_p$ and the incidence coefficients
+$$
+a_{ip} = \begin{cases} 1 & \text{if leg } i \text{ is in pairing } p, \\ 0 & \text{otherwise.} \end{cases}
+$$
+Let $x_p \in \{0, 1\}$ indicate that pairing $p$ is used. The **crew pairing problem** is
+$$
+\begin{aligned}
+\min_{x} \quad & \sum_{p \in P} c_p\, x_p \\
+\text{s.t.} \quad & \sum_{p \in P} a_{ip}\, x_p = 1, && i \in L \quad \text{(cover each leg exactly once)} \\
+& x_p \in \{0, 1\}, && p \in P .
+\end{aligned}
+$$
+This is a **set partitioning problem**. The rows are flight legs and the columns are pairings; a column has a 1 in the rows of the legs it flies. All the complicated rules live *inside* the definition of a column — a column exists only if the pairing is legal — so the master problem itself is very simple.
+
+Two common variants:
+
+- **Set covering.** Writing $\ge 1$ instead of $= 1$ allows a leg to carry more than one crew, the extra crew travelling as passengers to reposition (**deadheading**). Deadheads are usually given an explicit cost.
+- **Base constraints.** Rows limiting the total work assigned to each crew base, $\sum_p h_{bp} x_p \le H_b$, where $h_{bp}$ is the hours pairing $p$ contributes to base $b$ and $H_b$ the base's capacity, keep the solution consistent with where crew actually live.
+
+### Why the number of pairings explodes
+
+A pairing is a path through a network whose nodes are legs and whose arcs are legal connections. If each leg has on average $k$ legal onward connections and pairings contain up to $\ell$ legs, the number of candidate sequences is of the order of $|L|\,k^{\ell - 1}$ — exponential in pairing length. A large airline flies thousands of legs per day with pairings of a dozen or more legs over several days, so the number of legal pairings is astronomically large, far beyond what could be enumerated or stored. Early approaches therefore generated a limited pool of "good" pairings heuristically and solved the IP over that pool, with no guarantee of optimality. Column generation removes the need to choose the pool in advance.
+
+## Solution methods
+
+### The LP relaxation and its dual
+
+Relaxing $x_p \in \{0, 1\}$ to $x_p \ge 0$ gives the **master LP**. Its dual has one variable $y_i$ for each leg:
+$$
+\max_{y} \; \sum_{i \in L} y_i \quad \text{s.t.} \quad \sum_{i \in L} a_{ip}\, y_i \le c_p, \quad p \in P .
+$$
+The dual variable $y_i$ can be read as the price the solution places on covering leg $i$. The reduced cost of pairing $p$ is then
+$$
+\bar c_p = c_p - \sum_{i \in p} y_i ,
+$$
+its cost minus the value of the legs it covers. A primal solution is optimal for the LP if and only if no pairing has negative reduced cost.
+
+### Column generation
+
+Column generation solves the master LP without listing all the columns.
+
+1. **Restricted master problem (RMP).** Start with a small set $P' \subseteq P$ of pairings that can cover every leg — for instance from the previous schedule, or with artificial single-leg columns at a high cost. Solve the LP over $P'$ only, and obtain its optimal duals $y$.
+2. **Pricing.** Find the pairing in the full set $P$ with the most negative reduced cost, $\min_{p \in P} \bar c_p$.
+3. If that minimum is negative, add the pairing (often several good ones) to $P'$ and return to step 1. Otherwise no column can improve the LP, and the RMP solution is optimal for the full master LP.
+
+The method is the simplex method in which the entering variable is found by solving an optimisation problem instead of scanning a list.
+
+<Definition name="Pricing subproblem">
+Build a network with a source and a sink at the crew base, a node for each leg, and an arc for each legal connection between legs, from the source to each leg departing the base and from each leg arriving at the base to the sink. Giving each leg node a cost of minus its dual $y_i$, and arcs the costs of the connections, a source–sink path is a sequence of legs and its length is its reduced cost. The pricing problem is a **shortest-path problem with resource constraints**: resources such as accumulated flying time, duty time, landings and time since last rest are tracked along the path, and a path is admissible only if every resource stays within its limit.
+</Definition>
+
+The resource-constrained shortest path problem is NP-hard in general, but **labelling algorithms** solve practical instances well. Each label stores the cost and resource consumption of a partial path ending at a node; labels are extended along arcs, and a label is discarded when another label at the same node is no worse in cost and in every resource (**dominance**). Because the flight network is acyclic in time, labels can be processed in time order. Nonlinear pay rules are handled by carrying the relevant quantities as resources and evaluating the cost at the sink.
+
+### Branch and price
+
+The master LP solution is usually fractional, and simply rounding it, or solving the IP over the final columns $P'$, may give a poor or infeasible schedule. **Branch and price** embeds column generation in branch and bound: the LP is solved by column generation at every node of the search tree.
+
+The branching rule must be compatible with pricing. Fixing a single $x_p = 0$ is a bad choice, since the pricing problem would just regenerate pairing $p$ or one very similar. The standard rule for set partitioning, due to Ryan and Foster, branches on *pairs of legs*: choose two legs $r$ and $s$ whose combined coverage $\sum_{p \ni r, s} x_p$ is fractional, and create two branches.
+
+- **Together:** legs $r$ and $s$ must be in the same pairing. Remove columns containing exactly one of them; in pricing, a path visiting one must visit the other.
+- **Apart:** legs $r$ and $s$ must be in different pairings. Remove columns containing both; in pricing, forbid paths visiting both.
+
+Both rules change the pricing network without destroying its structure. In practice airlines often use heuristic variants — diving down one branch, fixing columns with values near one — and stop with a small gap between the IP solution and the LP bound.
+
+## Worked example
+
+<Example name="Six legs, ten pairings">
+A pairing generator has produced ten legal pairings for six flight legs. The incidence matrix and costs (in cost units) are:
+
+| Leg | $P_1$ | $P_2$ | $P_3$ | $P_4$ | $P_5$ | $P_6$ | $P_7$ | $P_8$ | $P_9$ | $P_{10}$ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1 | · | · | 1 | · | · | 1 | · | · | 1 |
+| 2 | 1 | · | · | · | 1 | · | 1 | · | 1 | · |
+| 3 | · | 1 | · | · | · | 1 | 1 | · | 1 | · |
+| 4 | · | 1 | · | 1 | · | · | · | 1 | · | 1 |
+| 5 | · | · | 1 | · | 1 | · | · | 1 | · | 1 |
+| 6 | · | · | 1 | · | · | 1 | · | 1 | 1 | · |
+| **Cost** | 11 | 8 | 8 | 8 | 8 | 10 | 13 | 14 | 14 | 13 |
+
+**The integer program.** Only four selections of columns cover every leg exactly once:
+
+| Pairings used | Cost |
+| --- | --- |
+| $P_1, P_2, P_3$ | 27 |
+| $P_4, P_5, P_6$ | **26** |
+| $P_7, P_8$ | 27 |
+| $P_9, P_{10}$ | 27 |
+
+so the unique optimum uses $P_4$, $P_5$ and $P_6$ at cost 26. HiGHS's MIP solver returns the same answer.
+
+**The LP relaxation.** The master LP has optimal value 25, attained at
+$$
+x_2 = x_5 = x_7 = x_9 = \tfrac13, \qquad x_3 = x_4 = \tfrac23, \qquad \text{all other } x_p = 0 .
+$$
+Each leg is covered exactly once in total: leg 2, for example, by $x_5 + x_7 + x_9 = 1$. Six variables are positive, matching the six rows, so the solution is non-degenerate and the duals are unique:
+$$
+y = (y_1, \dots, y_6) = (4,\; 5,\; 4,\; 4,\; 3,\; 5), \qquad \textstyle\sum_i y_i = 25 .
+$$
+The reduced costs $\bar c_p = c_p - \sum_{i \in p} y_i$ are
+
+| | $P_1$ | $P_2$ | $P_3$ | $P_4$ | $P_5$ | $P_6$ | $P_7$ | $P_8$ | $P_9$ | $P_{10}$ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| $\bar c_p$ | 2 | 0 | 0 | 0 | 0 | 1 | 0 | 2 | 0 | 2 |
+
+All are non-negative, so pricing finds no improving column and the LP is solved. For example $P_1$ costs 11 but covers legs worth $y_1 + y_2 = 9$, so it is 2 units too expensive to enter. If these ten columns were only a restricted master and the full set contained a further legal pairing covering legs 2 and 6 at cost 9, its reduced cost would be $9 - 10 = -1$ and it would enter.
+
+**Branching.** The LP bound 25 is below the IP optimum 26, so the LP alone does not prove optimality. Legs 1 and 4 appear together only in $P_4$ and $P_{10}$, with combined value $\tfrac23 + 0 = \tfrac23$, which is fractional. Ryan–Foster branching on this pair gives two subproblems:
+
+- *Together* (keep only columns with both or neither of legs 1 and 4: $P_3, P_4, P_5, P_6, P_9, P_{10}$): the LP optimum is integral, $P_4, P_5, P_6$ at cost 26.
+- *Apart* (remove $P_4$ and $P_{10}$): the LP bound is 27.
+
+Since 27 exceeds the incumbent 26, the second branch is pruned and the search ends: 26 is optimal.
+</Example>
+
+<Remark>
+The integrality gap here is about 4% of the optimum, which is large by the standards of real instances. Set partitioning LPs arising in crew pairing tend to be close to integral, with small gaps, which is one reason the approach works so well in practice.
+</Remark>
+
+## Crew rostering
+
+Pairing optimisation produces a set of anonymous trips. **Crew rostering** assigns them to individual crew members over a month. Each crew member $k$ has a set of feasible monthly rosters $Q_k$, respecting days off, monthly hour limits, rest between pairings, pre-assigned activities (training, leave, standby), and qualifications. With $z_{kq} = 1$ if crew member $k$ flies roster $q$, rostering is again a set partitioning model:
+$$
+\begin{aligned}
+\min_{z} \quad & \sum_{k} \sum_{q \in Q_k} d_{kq}\, z_{kq} \\
+\text{s.t.} \quad & \sum_{k} \sum_{q \in Q_k} b_{jq}\, z_{kq} = 1 && \text{for each pairing } j \\
+& \sum_{q \in Q_k} z_{kq} = 1 && \text{for each crew member } k \\
+& z_{kq} \in \{0, 1\} ,
+\end{aligned}
+$$
+where $b_{jq} = 1$ if roster $q$ contains pairing $j$, and $d_{kq}$ scores the roster — penalising deviation from target workload, rewarding granted preferences. The first constraint covers every pairing; the second gives every crew member exactly one roster. The same column generation machinery applies, with a pricing problem per crew member.
+
+The objective of rostering is often less about cost than about **fairness** and **quality of life**: balancing flying hours across crew, honouring requests for days off, and respecting seniority. Some airlines publish anonymous lines that crew bid for in seniority order; others build personalised rosters directly from individual requests.
+
+## Extensions
+
+- **Integrated planning.** Fleet assignment, aircraft routing and crew pairing are traditionally solved in sequence, but crew connections are only short when crew stay with the same aircraft. Integrated models solve aircraft routing and crew pairing together to capture this.
+- **Robustness.** Schedules optimised for cost tend to have tight connections that propagate delays. Robust pairing penalises short connections that involve an aircraft change or adds buffer to likely-delayed legs.
+- **Recovery.** On the day of operation, disruptions (weather, technical faults, sick crew) break the plan. Crew recovery re-solves a small pairing problem in minutes to restore feasibility with minimum change.
+- **Other industries.** The same set partitioning and column generation approach is used for rail crew scheduling, bus driver scheduling and, with different rules, nurse rostering.
+
+Further reading: Desaulniers, Desrosiers and Solomon (eds.), *Column Generation*, covers the method and its airline applications; Belobaba, Odoni and Barnhart (eds.), *The Global Airline Industry*, describes the planning process; Wolsey, *Integer Programming*, treats branch and price.

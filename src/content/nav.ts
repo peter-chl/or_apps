@@ -79,6 +79,29 @@ export const parts: Part[] = [
         summary:
           "Deciding how many seats to protect for high-fare demand, from Littlewood's rule to network bid prices and overbooking.",
       },
+      {
+        slug: "portfolio",
+        title: "Portfolio Optimisation",
+        summary:
+          "Trading off risk against return with Markowitz's mean–variance model, and minimising tail risk with CVaR as a linear program.",
+      },
+    ],
+  },
+  {
+    title: "Energy & Transport",
+    lectures: [
+      {
+        slug: "unit-commitment",
+        title: "Unit Commitment",
+        summary:
+          "Scheduling which power stations run each hour and how much they produce, and how the dual of the demand constraint sets the electricity price.",
+      },
+      {
+        slug: "crew-scheduling",
+        title: "Airline Crew Scheduling",
+        summary:
+          "Covering every flight with legal crew pairings via set partitioning, column generation and branch-and-price, then rostering them to individuals.",
+      },
     ],
   },
 ];

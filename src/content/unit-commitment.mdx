@@ -1,0 +1,146 @@
+Electricity is hard to store in bulk, so at every moment the power fed into the grid must match the power drawn from it. A system operator therefore has to decide, ahead of time, which generating units will run in each hour of tomorrow and how much each will produce, so that demand is met at least cost while every unit respects its technical limits.
+
+The problem has two layers. Given a set of units that are switched on, choosing their output levels is **economic dispatch**, a linear program whose dual gives the price of electricity. Deciding *which* units to switch on — when large thermal plants take hours to start, cost money to start, and cannot run below a minimum output — is **unit commitment**, a mixed-integer program. Together they are among the highest-value applications of OR: they are run every day by grid operators and power companies, and small percentage savings are worth very large sums.
+
+## The decision
+
+There are generating units $g \in G$ and hourly time periods $t = 1, \dots, T$, typically the 24 hours of the next day.
+
+- Demand in period $t$ is $D_t$ (MW, assumed known; forecast errors are covered by reserve).
+- Unit $g$ can produce between a minimum stable output $P^{\min}_g$ and a maximum $P^{\max}_g$ when on, and nothing when off.
+- Producing energy costs $c_g$ per MWh (the **marginal cost**, mostly fuel). A unit that is on also incurs a **no-load cost** $f_g$ per hour regardless of output, and switching it on costs a **startup cost** $S_g$.
+- Large units have **minimum up and down times** $UT_g$ and $DT_g$: once started, they must stay on for at least $UT_g$ hours; once stopped, they must stay off for at least $DT_g$ hours. They also have **ramp limits**: output can change by at most $R_g$ MW from one hour to the next.
+- The operator holds **spinning reserve**: committed but unused capacity of at least $r_t$ MW in each hour, to cover a sudden outage or forecast error.
+
+The decisions are the on/off status of each unit in each hour and its output level.
+
+## Economic dispatch
+
+Start with one period and assume the set of running units is fixed, with $0 \le p_g \le P^{\max}_g$ for simplicity. Let $p_g$ be the output of unit $g$.
+$$
+\begin{aligned}
+\min_{p} \quad & \sum_{g \in G} c_g\, p_g \\
+\text{s.t.} \quad & \sum_{g \in G} p_g = D && (\text{balance; dual } \pi) \\
+& 0 \le p_g \le P^{\max}_g, && g \in G \quad (\text{capacity; dual } \mu_g \ge 0)
+\end{aligned}
+$$
+The objective is total production cost; the balance constraint says supply equals demand.
+
+With linear costs the solution is the **merit order**: sort units by marginal cost and load them cheapest first until demand is met. The last unit loaded, which is running part-loaded, is the **marginal unit**.
+
+<Result name="The price of electricity">
+The dual variable $\pi$ of the balance constraint equals the marginal cost of the marginal unit: it is the increase in total cost if demand rises by 1 MW. Each fully loaded unit $g$ has capacity dual $\mu_g = \pi - c_g \ge 0$, and each unused unit has $c_g \ge \pi$.
+</Result>
+
+This is the marginal pricing principle behind most wholesale electricity markets: every MWh is paid $\pi$, the system marginal price. Cheap units earn $\pi - c_g$ per MWh above their running cost — their **infra-marginal rent**, which is exactly the capacity dual $\mu_g$ — and that rent is what pays for their capital cost.
+
+<Example name="Merit order with four units">
+Four units have the following capacities and marginal costs:
+
+| Unit | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Capacity (MW) | 250 | 200 | 150 | 100 |
+| Marginal cost (€/MWh) | 12 | 25 | 40 | 80 |
+
+With demand $D = 500$ MW the merit order loads unit 1 fully (250 MW), unit 2 fully (200 MW), and the remaining 50 MW from unit 3. Unit 4 stays off. Total cost is $250 \cdot 12 + 200 \cdot 25 + 50 \cdot 40 = 10\,000$ €/h.
+
+Solving the LP with HiGHS confirms this and returns the duals $\pi = 40$, $\mu_1 = 28$, $\mu_2 = 15$, $\mu_3 = \mu_4 = 0$. Raising demand to 501 MW raises cost by exactly 40 €. The price is a step function of demand: it is 25 €/MWh for demand between 250 and 450 MW (for example at 420 MW), 40 €/MWh between 450 and 600 MW, and 80 €/MWh between 600 and 700 MW.
+</Example>
+
+## Unit commitment formulation
+
+Economic dispatch ignores the fact that a unit must be *on* to produce and that turning it on and off has consequences across hours. Unit commitment adds binary variables for each unit $g$ and period $t$:
+
+- $u_{gt} \in \{0, 1\}$: unit $g$ is on in period $t$;
+- $v_{gt} \in \{0, 1\}$: unit $g$ starts up at the beginning of period $t$;
+- $w_{gt} \in \{0, 1\}$: unit $g$ shuts down at the beginning of period $t$;
+- $p_{gt} \ge 0$: output of unit $g$ in period $t$ (MW, held for the hour).
+
+The model is
+$$
+\begin{aligned}
+\min \quad & \sum_{t=1}^{T} \sum_{g \in G} \big( c_g\, p_{gt} + f_g\, u_{gt} + S_g\, v_{gt} \big) \\
+\text{s.t.} \quad & \sum_{g \in G} p_{gt} = D_t && \forall t \\
+& P^{\min}_g u_{gt} \le p_{gt} \le P^{\max}_g u_{gt} && \forall g, t \\
+& u_{gt} - u_{g,t-1} = v_{gt} - w_{gt} && \forall g, t \\
+& \textstyle\sum_{\tau = t - UT_g + 1}^{t} v_{g\tau} \le u_{gt} && \forall g, t \\
+& \textstyle\sum_{\tau = t - DT_g + 1}^{t} w_{g\tau} \le 1 - u_{gt} && \forall g, t \\
+& p_{gt} - p_{g,t-1} \le R_g\, u_{g,t-1} + \bar S_g\, v_{gt} && \forall g, t \\
+& p_{g,t-1} - p_{gt} \le R_g\, u_{gt} + \bar S_g\, w_{gt} && \forall g, t \\
+& \textstyle\sum_{g \in G} \big( P^{\max}_g u_{gt} - p_{gt} \big) \ge r_t && \forall t .
+\end{aligned}
+$$
+
+Reading the constraints in order:
+
+- **Balance.** Total output meets demand in every hour. Its dual $\pi_t$ is again the price of energy in hour $t$.
+- **Output limits.** If the unit is off ($u_{gt} = 0$) its output is forced to zero; if on, it must lie between its minimum stable and maximum output. This is the key non-convexity: a unit cannot produce 5 MW if its minimum is 100 MW.
+- **Start-up/shut-down logic.** A change of status from off to on must be recorded as a startup, and from on to off as a shutdown. Since the startup cost is in the objective, the solver will never set $v_{gt} = 1$ needlessly. The initial status $u_{g0}$ is data.
+- **Minimum up time.** If the unit started at any time in the last $UT_g$ periods, it must be on now. **Minimum down time** is symmetric: if it shut down in the last $DT_g$ periods, it must be off now. (The window is truncated at $t = 1$; a full model also carries over how long each unit has already been on or off.)
+- **Ramping.** Between consecutive hours output can rise by at most $R_g$ if the unit was already on, and fall by at most $R_g$ if it stays on. A unit starting up or shutting down may jump to or from any level up to its start-up/shut-down limit $\bar S_g$, which must be at least $P^{\min}_g$.
+- **Spinning reserve.** The headroom on committed units, $P^{\max}_g u_{gt} - p_{gt}$, must total at least $r_t$. Reserve can only come from units that are on, so this constraint often forces extra units to be committed.
+
+The formulation above is the "three-binary" form with start-up and shut-down variables. Its LP relaxation is considerably tighter than that of older formulations built around the $u_{gt}$ variables alone, and the tightness of the relaxation matters a great deal for solving speed.
+
+## Solution methods
+
+Unit commitment is NP-hard in general, but modern MIP solvers handle realistic instances — hundreds of units, 24 to 48 hourly periods — within the time windows operators allow, provided the formulation is tight.
+
+- **Branch and cut.** The standard approach today. Solvers exploit the tight three-binary formulation, add valid inequalities for minimum up/down and ramping, and use the LP relaxation to guide branching. Stopping at a small optimality gap (say 0.1%) is normal.
+- **Lagrangian relaxation.** The historical workhorse. Relaxing the balance and reserve constraints, which are the only ones linking units, with multipliers $\pi_t$ splits the problem into one small single-unit problem per generator, each solvable by dynamic programming over the hours. The multipliers are adjusted (for example by subgradient steps) and look like prices. Its weakness is that the relaxed solution is generally infeasible and must be repaired heuristically.
+- **Decomposition and heuristics.** Priority-list commitment (commit units in merit order until demand plus reserve is covered) is fast but crude; it is still used to build starting solutions.
+
+## Worked example
+
+<Example name="Three units over six hours">
+Three thermal units with the following data:
+
+| Unit | $P^{\min}$ | $P^{\max}$ | $c_g$ (€/MWh) | No-load $f_g$ (€/h) | Startup $S_g$ (€) | $UT_g$ / $DT_g$ (h) | Ramp $R_g$ (MW/h) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A (baseload) | 100 | 300 | 15 | 400 | 1500 | 4 / 4 | 80 |
+| B (mid-merit) | 40 | 180 | 30 | 150 | 400 | 2 / 2 | 120 |
+| C (peaker) | 10 | 80 | 60 | 30 | 50 | 1 / 1 | 80 |
+
+The start-up/shut-down limit is $\bar S_g = \max(P^{\min}_g, R_g)$. Before hour 1, unit A is on at 200 MW and B and C are off. Demand over six hours is 220, 300, 420, 480, 360 and 240 MW, and the reserve requirement is 10% of demand.
+
+Solved exactly as a MIP with HiGHS (54 binary and 18 continuous variables), the optimal schedule is
+
+| Hour | 1 | 2 | 3 | 4 | 5 | 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Demand | 220 | 300 | 420 | 480 | 360 | 240 |
+| A | 220 | 290 | 300 | 300 | 300 | 240 |
+| B | · | · | 120 | 170 | 60 | · |
+| C | · | 10 | · | 10 | · | · |
+| Reserve held / required | 80 / 22 | 80 / 30 | 60 / 42 | 80 / 48 | 120 / 36 | 60 / 24 |
+
+with total cost 39 860 €: 36 450 € of energy, 2 910 € of no-load cost and 500 € of startups (B once, C twice).
+
+Several features are worth noticing.
+
+- *Reserve drives commitment.* In hour 2, demand of 300 MW could be met by A alone at full output, but that would leave no reserve. The cheapest way to hold 30 MW of headroom is to start the peaker C at its 10 MW minimum and back A off to 290 MW. Similarly in hour 4, A and B together could just meet 480 MW, but again with zero reserve, so C is started a second time.
+- *Peaker cycling.* C is cheap to start (50 €) and has a one-hour minimum down time, so it is started twice rather than kept running through hour 3.
+- *Minimum output binds.* Every time C runs, it runs at its minimum 10 MW.
+
+The commitment is the unique optimum: excluding it and re-solving gives a best alternative of 40 080 €, which starts B an hour earlier instead of using C in hour 2. The LP relaxation, with binaries allowed to take fractional values, has value 39 176.67 €, a gap of 1.7%.
+
+**Prices.** Fixing the binaries at their optimal values and re-solving the dispatch LP gives balance-constraint duals of 15, 15, 30, 30, 30 and 15 €/MWh: A is marginal in hours 1, 2 and 6, and B in hours 3–5. At these prices unit A earns a surplus of 11 100 € over its running costs, but B falls short by 850 € and C by 910 €, because the energy price does not reflect their startup and no-load costs (C, in particular, produces at 60 €/MWh while being paid 15 or 30). Markets cover such shortfalls with **uplift** or make-whole payments, and the design of prices for non-convex markets remains an active research area.
+</Example>
+
+## Locational marginal prices
+
+So far the grid has been a single "copper plate". In reality power flows over transmission lines with limited capacity, and where it flows is governed by physics rather than by contracts. The standard linear approximation is the **DC power flow**: each bus $i$ has a voltage angle $\theta_i$, the flow on line $(i, j)$ is $(\theta_i - \theta_j)/x_{ij}$ where $x_{ij}$ is the line reactance, flows are bounded by thermal limits, and the single balance constraint is replaced by one balance constraint per bus (injections minus withdrawals equal net outflow).
+
+The dual of the balance constraint at bus $i$ is the **locational marginal price** (LMP) at $i$: the cost of supplying one more MW there. If no line is congested, all LMPs are equal to the system marginal price. When a line hits its limit, cheap power cannot reach some buses, more expensive local units must run, and prices separate: the LMP difference across a congested line is the value of its scarce capacity.
+
+<Remark>
+Several organised day-ahead electricity markets clear by solving a security-constrained unit commitment — the model above extended with a DC network and contingency constraints — as a large MIP, then compute prices from the dispatch LP with the commitment fixed, much as in the worked example. The details of formulation, pricing and uplift differ from market to market.
+</Remark>
+
+## Extensions
+
+- **Uncertainty.** Wind and solar output and demand are uncertain. **Stochastic unit commitment** optimises commitment against a set of scenarios, and **robust unit commitment** against an uncertainty set; both reduce the need for fixed reserve margins at the cost of much larger models.
+- **Storage and hydro.** Batteries and reservoirs link periods through state-of-charge constraints; hydro scheduling adds water balances and cascades of reservoirs, and is often handled by stochastic dynamic programming over seasons.
+- **Nonlinear costs.** Real fuel curves are convex quadratic or non-convex with valve-point effects; they are usually approximated by piecewise-linear functions inside the MIP.
+- **AC power flow.** The full AC equations are non-convex. Optimal power flow with AC physics is solved by nonlinear programming or convex relaxations, normally after commitment has been fixed.
+
+Further reading: Wood, Wollenberg and Sheblé, *Power Generation, Operation, and Control*, is the standard engineering text; Kirschen and Strbac, *Fundamentals of Power System Economics*, covers markets and pricing.
