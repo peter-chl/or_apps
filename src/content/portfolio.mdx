@@ -1,10 +1,10 @@
 An investor has a sum of money to divide between a number of risky assets — shares, bonds, funds. Each asset has an uncertain return. Putting everything into the asset with the highest expected return is rarely wise, because that asset is usually also the most volatile; spreading the money reduces risk, but by how much, and at what cost in expected return?
 
-**Portfolio optimisation** makes this trade-off precise. Markowitz (1952) proposed measuring risk by the variance of the portfolio return, which turns portfolio selection into a quadratic program. The resulting picture — the *efficient frontier* — is still the starting point of quantitative asset management. This lecture develops the mean–variance model, works it out in closed form, and then looks at a tail-risk alternative, CVaR, which leads to a linear program.
+**Portfolio optimization** makes this trade-off precise. Markowitz (1952) proposed measuring risk by the variance of the portfolio return, which turns portfolio selection into a quadratic program. The resulting picture — the *efficient frontier* — is still the starting point of quantitative asset management. This lecture develops the mean–variance model, works it out in closed form, and then looks at a tail-risk alternative, CVaR, which leads to a linear program.
 
 ## The decision
 
-There are $n$ assets indexed by $i$. Over the investment period, asset $i$ has a random return $R_i$ (for example $0.08$ means the asset gains 8%). We summarise the joint distribution of returns by two quantities:
+There are $n$ assets indexed by $i$. Over the investment period, asset $i$ has a random return $R_i$ (for example $0.08$ means the asset gains 8%). We summarize the joint distribution of returns by two quantities:
 
 - the **expected returns** $\mu_i = \mathbb{E}[R_i]$, collected in a vector $\mu \in \mathbb{R}^n$;
 - the **covariance matrix** $\Sigma$, with entries $\sigma_{ij} = \operatorname{Cov}(R_i, R_j)$. Its diagonal holds the variances $\sigma_i^2$, and $\sigma_{ij} = \rho_{ij}\sigma_i\sigma_j$ where $\rho_{ij}$ is the correlation.
@@ -29,7 +29,7 @@ $$
 $$
 The objective is the portfolio variance. The first constraint fixes the expected return at the target $r$ (writing it as an inequality $\mu^\top w \ge r$ gives the same answer whenever $r$ is above the return of the minimum-variance portfolio). The second says all wealth is invested; $\mathbf{1}$ is the vector of ones. There is no sign constraint on $w$, so short selling is allowed for now.
 
-This is a **convex quadratic program**: a convex quadratic objective with linear constraints. Two equivalent variants are common: maximise $\mu^\top w$ subject to a variance cap $w^\top \Sigma w \le \sigma_{\max}^2$, or maximise $\mu^\top w - \tfrac{\delta}{2} w^\top \Sigma w$ for a risk-aversion parameter $\delta > 0$. Varying $r$, $\sigma_{\max}$ or $\delta$ traces out the same set of optimal portfolios.
+This is a **convex quadratic program**: a convex quadratic objective with linear constraints. Two equivalent variants are common: maximize $\mu^\top w$ subject to a variance cap $w^\top \Sigma w \le \sigma_{\max}^2$, or maximize $\mu^\top w - \tfrac{\delta}{2} w^\top \Sigma w$ for a risk-aversion parameter $\delta > 0$. Varying $r$, $\sigma_{\max}$ or $\delta$ traces out the same set of optimal portfolios.
 
 <Definition name="Efficient frontier">
 A portfolio is **efficient** if no other portfolio has a higher expected return with the same or lower variance, or a lower variance with the same or higher expected return. Plotting standard deviation against expected return, the efficient portfolios form a curve called the **efficient frontier**. The portfolio with the smallest variance of all is the **global minimum-variance portfolio**; the efficient frontier is the part of the minimum-variance curve lying above it.
@@ -128,24 +128,24 @@ $$
 This is still a convex QP, but the closed form is lost: the KKT conditions now include complementary slackness, $w_i > 0$ only if the stationarity equation for asset $i$ holds with equality. In effect the solver must discover which assets to hold. The target can now be met only if $r \le \max_i \mu_i$.
 
 <Example name="The 13% target without shorting">
-With $w \ge 0$ and $r = 0.13$, the optimiser drops asset 1 entirely. With only assets 2 and 3 left, the target pins the portfolio down: $0.10\,w_2 + 0.14\,w_3 = 0.13$ and $w_2 + w_3 = 1$ give $w = (0, 0.25, 0.75)$, with variance $0.102375$ and standard deviation $32.0\%$, against $31.0\%$ when shorting is allowed. At the 10% target the constraint is inactive — the unconstrained optimum already has all weights positive — so nothing changes there. At $r = 0.14$ the only feasible portfolio is all in asset 3.
+With $w \ge 0$ and $r = 0.13$, the optimizer drops asset 1 entirely. With only assets 2 and 3 left, the target pins the portfolio down: $0.10\,w_2 + 0.14\,w_3 = 0.13$ and $w_2 + w_3 = 1$ give $w = (0, 0.25, 0.75)$, with variance $0.102375$ and standard deviation $32.0\%$, against $31.0\%$ when shorting is allowed. At the 10% target the constraint is inactive — the unconstrained optimum already has all weights positive — so nothing changes there. At $r = 0.14$ the only feasible portfolio is all in asset 3.
 </Example>
 
 The constrained frontier lies on or to the right of the unconstrained one and coincides with it wherever the unconstrained weights happen to be non-negative.
 
-## CVaR minimisation as a linear program
+## CVaR minimization as a linear program
 
-Variance penalises gains and losses symmetrically, and it says little about the tail — the bad outcomes regulators and risk managers care about most. A tail-focused alternative is the conditional value-at-risk.
+Variance penalizes gains and losses symmetrically, and it says little about the tail — the bad outcomes regulators and risk managers care about most. A tail-focused alternative is the conditional value-at-risk.
 
 <Definition name="VaR and CVaR">
 Let $L$ be the portfolio loss (the negative of the return) and $\beta \in (0,1)$ a confidence level such as $0.95$. The **value-at-risk** $\operatorname{VaR}_\beta$ is the $\beta$-quantile of $L$: losses exceed it with probability at most $1 - \beta$. The **conditional value-at-risk** $\operatorname{CVaR}_\beta$ is, roughly, the expected loss given that the loss is in the worst $1 - \beta$ tail. With finitely many equally likely scenarios and $(1-\beta)$ times the number of scenarios a whole number $k$, it is exactly the average of the $k$ largest losses.
 </Definition>
 
-VaR is not convex in the weights and is awkward to optimise. CVaR is convex, and Rockafellar and Uryasev (2000) showed it can be written as a minimisation over an auxiliary variable $\alpha$:
+VaR is not convex in the weights and is awkward to optimize. CVaR is convex, and Rockafellar and Uryasev (2000) showed it can be written as a minimization over an auxiliary variable $\alpha$:
 $$
 \operatorname{CVaR}_\beta(L) = \min_{\alpha} \left\{ \alpha + \frac{1}{1-\beta}\, \mathbb{E}\big[(L - \alpha)^+\big] \right\},
 $$
-where $(z)^+ = \max(z, 0)$, and the minimising $\alpha$ is a VaR.
+where $(z)^+ = \max(z, 0)$, and the minimizing $\alpha$ is a VaR.
 
 Now approximate the return distribution by $S$ **scenarios**: scenario $s$ has probability $p_s$ and return vector $r_s$, for example from historical data or simulation. The loss in scenario $s$ is $-r_s^\top w$. Introducing $u_s \ge 0$ to stand for $(L_s - \alpha)^+$ gives the linear program
 $$
@@ -184,8 +184,8 @@ Scenario-based CVaR solutions can be sensitive to the particular scenarios drawn
 
 The textbook model is elegant but fragile. Real portfolio construction adds several layers.
 
-- **Estimation error.** $\mu$ and $\Sigma$ are estimated from data, and the optimiser treats the estimates as truth. It overweights assets whose expected returns happen to be overestimated — "error maximisation". Expected returns are especially hard to estimate. Common remedies are shrinkage estimators for $\Sigma$, factor models, blending with an equilibrium prior (the Black–Litterman approach), weight bounds, and robust optimisation, which minimises risk against the worst $\mu$ in an uncertainty set.
-- **Transaction costs and turnover.** Moving from current holdings $w^0$ to $w$ costs money. Proportional costs $\sum_i c_i |w_i - w^0_i|$ can be linearised by splitting each trade into a purchase $w_i^+ \ge 0$ and a sale $w_i^- \ge 0$ with $w_i - w^0_i = w_i^+ - w_i^-$; the model remains a QP. Fixed costs per trade need binary variables.
+- **Estimation error.** $\mu$ and $\Sigma$ are estimated from data, and the optimizer treats the estimates as truth. It overweights assets whose expected returns happen to be overestimated — "error maximization". Expected returns are especially hard to estimate. Common remedies are shrinkage estimators for $\Sigma$, factor models, blending with an equilibrium prior (the Black–Litterman approach), weight bounds, and robust optimization, which minimizes risk against the worst $\mu$ in an uncertainty set.
+- **Transaction costs and turnover.** Moving from current holdings $w^0$ to $w$ costs money. Proportional costs $\sum_i c_i |w_i - w^0_i|$ can be linearized by splitting each trade into a purchase $w_i^+ \ge 0$ and a sale $w_i^- \ge 0$ with $w_i - w^0_i = w_i^+ - w_i^-$; the model remains a QP. Fixed costs per trade need binary variables.
 - **Cardinality and minimum-holding constraints.** Managers often want at most $K$ assets, and any asset held to be held in at least a minimum size $\ell_i$. With binary $z_i$ indicating whether asset $i$ is held,
 $$
 \ell_i z_i \le w_i \le u_i z_i, \qquad \sum_{i=1}^n z_i \le K, \qquad z_i \in \{0, 1\},

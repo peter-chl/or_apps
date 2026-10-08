@@ -1,18 +1,18 @@
 Operations research (OR) is the discipline of making decisions with mathematical models. The phrase is old — it comes from the analysis groups set up in Britain and the United States during the Second World War to study radar deployment, convoy sizing and bombing patterns — but the activity it names is now everywhere: in the software that routes parcel vans, sets airline fares, schedules nurses, and decides which power stations run tomorrow morning.
 
-These notes are about those *applications*. Each lecture picks one decision problem that organisations actually face and works through it end to end.
+These notes are about those *applications*. Each lecture picks one decision problem that organizations actually face and works through it end to end.
 
-## The modelling cycle
+## The modeling cycle
 
 Every application in these notes follows the same loop.
 
 1. **Describe the decision.** Who decides what, how often, and under which rules? A depot manager choosing tomorrow's van routes faces a different problem from a planner choosing where to build depots for the next ten years, even though both are "logistics".
-2. **Formulate a model.** Name the *decision variables* (what you control), the *objective* (what you are trying to minimise or maximise), and the *constraints* (what must hold). The output is a precise mathematical statement.
+2. **Formulate a model.** Name the *decision variables* (what you control), the *objective* (what you are trying to minimize or maximize), and the *constraints* (what must hold). The output is a precise mathematical statement.
 3. **Solve it.** Choose an algorithm — exact, heuristic, or simulation — appropriate to the model's structure and size.
 4. **Interpret and validate.** Check that the answer makes sense to the people who will use it. Ask what the model left out. Usually you return to step 1.
 
-<Definition name="Optimisation model">
-An optimisation model has the form
+<Definition name="Optimization model">
+An optimization model has the form
 $$
 \min_{x \in X} \; f(x) \quad \text{subject to} \quad g_i(x) \le 0, \; i = 1, \dots, m,
 $$
@@ -29,10 +29,10 @@ OR draws on a fairly small set of model classes. Most applications in these note
 | --- | --- | --- | --- |
 | Linear programming (LP) | continuous | transportation, blending, production planning | simplex, interior point |
 | Integer / mixed-integer programming (MIP) | some integer or binary | facility location, scheduling, routing | branch and bound, cutting planes |
-| Network flows | flows on arcs | transportation, assignment, shortest paths | specialised simplex, combinatorial algorithms |
+| Network flows | flows on arcs | transportation, assignment, shortest paths | specialized simplex, combinatorial algorithms |
 | Nonlinear / quadratic programming | continuous | portfolio selection, pricing | interior point, gradient methods |
 | Stochastic models | random parameters | inventory, revenue management | newsvendor analysis, dynamic programming, sampling |
-| Queueing theory | arrival and service processes | call centres, hospitals, networks | closed-form formulas, simulation |
+| Queueing theory | arrival and service processes | call centers, hospitals, networks | closed-form formulas, simulation |
 | Heuristics and metaheuristics | any | large routing and scheduling instances | construction, local search, tabu, genetic algorithms |
 
 <Remark>
@@ -58,7 +58,7 @@ If either problem has a finite optimum, so does the other, and the optimal value
 
 The economic reading is what makes duality useful in applications. The dual variable $y_i^*$ is the rate at which the optimal cost changes as the right-hand side $b_i$ changes — the **shadow price** of constraint $i$. If constraint $i$ says "meet demand at market $i$", then $y_i^*$ is the marginal cost of serving one more unit there. We will use this interpretation in the transportation problem, in electricity markets (where shadow prices *are* the market prices), and in airline revenue management (where they become bid prices).
 
-## How these notes are organised
+## How these notes are organized
 
 The lectures are grouped by application area rather than by technique, because that is how problems arrive in practice: nobody hands you "an integer program", they hand you a depot and a fleet of vans. Each lecture follows roughly the same structure:
 

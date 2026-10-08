@@ -1,4 +1,4 @@
-After fuel, crew is typically one of an airline's largest operating costs. Every flight in the timetable needs a qualified cockpit and cabin crew, and crew members are bound by a thick book of rules — from aviation regulators, labour agreements and company policy — about how long they may work, how much rest they need, and where they must start and finish. Building crew schedules that cover every flight legally at minimum cost is a large combinatorial problem, and it is one of the great success stories of integer programming.
+After fuel, crew is typically one of an airline's largest operating costs. Every flight in the timetable needs a qualified cockpit and cabin crew, and crew members are bound by a thick book of rules — from aviation regulators, labor agreements and company policy — about how long they may work, how much rest they need, and where they must start and finish. Building crew schedules that cover every flight legally at minimum cost is a large combinatorial problem, and it is one of the great success stories of integer programming.
 
 Airlines split the problem into two stages. **Crew pairing** builds anonymous multi-day work patterns that cover the flights; **crew rostering** then assigns those patterns to named individuals. This lecture concentrates on pairing, which is a set partitioning problem with far too many columns to write down, solved by column generation.
 
@@ -6,7 +6,7 @@ Airlines split the problem into two stages. **Crew pairing** builds anonymous mu
 
 The input is the flight schedule for a planning period, typically a representative week or a full month, for one crew type (for example captains qualified on one aircraft family). Each scheduled flight is a **flight leg**: a single take-off and landing, with departure and arrival stations and times.
 
-Crew members are based at a **crew base** (or *domicile*), where they live. Their work is organised in three nested levels:
+Crew members are based at a **crew base** (or *domicile*), where they live. Their work is organized in three nested levels:
 
 - a **duty** (or duty period) is a sequence of legs flown in one working day, separated by short connections;
 - a **pairing** (or *trip*) is a sequence of duties, separated by overnight rests away from home, that starts and ends at the same crew base, typically one to five days long;
@@ -38,7 +38,7 @@ This is a **set partitioning problem**. The rows are flight legs and the columns
 
 Two common variants:
 
-- **Set covering.** Writing $\ge 1$ instead of $= 1$ allows a leg to carry more than one crew, the extra crew travelling as passengers to reposition (**deadheading**). Deadheads are usually given an explicit cost.
+- **Set covering.** Writing $\ge 1$ instead of $= 1$ allows a leg to carry more than one crew, the extra crew traveling as passengers to reposition (**deadheading**). Deadheads are usually given an explicit cost.
 - **Base constraints.** Rows limiting the total work assigned to each crew base, $\sum_p h_{bp} x_p \le H_b$, where $h_{bp}$ is the hours pairing $p$ contributes to base $b$ and $H_b$ the base's capacity, keep the solution consistent with where crew actually live.
 
 ### Why the number of pairings explodes
@@ -67,13 +67,13 @@ Column generation solves the master LP without listing all the columns.
 2. **Pricing.** Find the pairing in the full set $P$ with the most negative reduced cost, $\min_{p \in P} \bar c_p$.
 3. If that minimum is negative, add the pairing (often several good ones) to $P'$ and return to step 1. Otherwise no column can improve the LP, and the RMP solution is optimal for the full master LP.
 
-The method is the simplex method in which the entering variable is found by solving an optimisation problem instead of scanning a list.
+The method is the simplex method in which the entering variable is found by solving an optimization problem instead of scanning a list.
 
 <Definition name="Pricing subproblem">
 Build a network with a source and a sink at the crew base, a node for each leg, and an arc for each legal connection between legs, from the source to each leg departing the base and from each leg arriving at the base to the sink. Giving each leg node a cost of minus its dual $y_i$, and arcs the costs of the connections, a source–sink path is a sequence of legs and its length is its reduced cost. The pricing problem is a **shortest-path problem with resource constraints**: resources such as accumulated flying time, duty time, landings and time since last rest are tracked along the path, and a path is admissible only if every resource stays within its limit.
 </Definition>
 
-The resource-constrained shortest path problem is NP-hard in general, but **labelling algorithms** solve practical instances well. Each label stores the cost and resource consumption of a partial path ending at a node; labels are extended along arcs, and a label is discarded when another label at the same node is no worse in cost and in every resource (**dominance**). Because the flight network is acyclic in time, labels can be processed in time order. Nonlinear pay rules are handled by carrying the relevant quantities as resources and evaluating the cost at the sink.
+The resource-constrained shortest path problem is NP-hard in general, but **labeling algorithms** solve practical instances well. Each label stores the cost and resource consumption of a partial path ending at a node; labels are extended along arcs, and a label is discarded when another label at the same node is no worse in cost and in every resource (**dominance**). Because the flight network is acyclic in time, labels can be processed in time order. Nonlinear pay rules are handled by carrying the relevant quantities as resources and evaluating the cost at the sink.
 
 ### Branch and price
 
@@ -142,7 +142,7 @@ The integrality gap here is about 4% of the optimum, which is large by the stand
 
 ## Crew rostering
 
-Pairing optimisation produces a set of anonymous trips. **Crew rostering** assigns them to individual crew members over a month. Each crew member $k$ has a set of feasible monthly rosters $Q_k$, respecting days off, monthly hour limits, rest between pairings, pre-assigned activities (training, leave, standby), and qualifications. With $z_{kq} = 1$ if crew member $k$ flies roster $q$, rostering is again a set partitioning model:
+Pairing optimization produces a set of anonymous trips. **Crew rostering** assigns them to individual crew members over a month. Each crew member $k$ has a set of feasible monthly rosters $Q_k$, respecting days off, monthly hour limits, rest between pairings, pre-assigned activities (training, leave, standby), and qualifications. With $z_{kq} = 1$ if crew member $k$ flies roster $q$, rostering is again a set partitioning model:
 $$
 \begin{aligned}
 \min_{z} \quad & \sum_{k} \sum_{q \in Q_k} d_{kq}\, z_{kq} \\
@@ -151,14 +151,14 @@ $$
 & z_{kq} \in \{0, 1\} ,
 \end{aligned}
 $$
-where $b_{jq} = 1$ if roster $q$ contains pairing $j$, and $d_{kq}$ scores the roster — penalising deviation from target workload, rewarding granted preferences. The first constraint covers every pairing; the second gives every crew member exactly one roster. The same column generation machinery applies, with a pricing problem per crew member.
+where $b_{jq} = 1$ if roster $q$ contains pairing $j$, and $d_{kq}$ scores the roster — penalizing deviation from target workload, rewarding granted preferences. The first constraint covers every pairing; the second gives every crew member exactly one roster. The same column generation machinery applies, with a pricing problem per crew member.
 
-The objective of rostering is often less about cost than about **fairness** and **quality of life**: balancing flying hours across crew, honouring requests for days off, and respecting seniority. Some airlines publish anonymous lines that crew bid for in seniority order; others build personalised rosters directly from individual requests.
+The objective of rostering is often less about cost than about **fairness** and **quality of life**: balancing flying hours across crew, honoring requests for days off, and respecting seniority. Some airlines publish anonymous lines that crew bid for in seniority order; others build personalized rosters directly from individual requests.
 
 ## Extensions
 
 - **Integrated planning.** Fleet assignment, aircraft routing and crew pairing are traditionally solved in sequence, but crew connections are only short when crew stay with the same aircraft. Integrated models solve aircraft routing and crew pairing together to capture this.
-- **Robustness.** Schedules optimised for cost tend to have tight connections that propagate delays. Robust pairing penalises short connections that involve an aircraft change or adds buffer to likely-delayed legs.
+- **Robustness.** Schedules optimized for cost tend to have tight connections that propagate delays. Robust pairing penalizes short connections that involve an aircraft change or adds buffer to likely-delayed legs.
 - **Recovery.** On the day of operation, disruptions (weather, technical faults, sick crew) break the plan. Crew recovery re-solves a small pairing problem in minutes to restore feasibility with minimum change.
 - **Other industries.** The same set partitioning and column generation approach is used for rail crew scheduling, bus driver scheduling and, with different rules, nurse rostering.
 

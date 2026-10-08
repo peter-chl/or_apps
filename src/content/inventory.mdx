@@ -23,7 +23,7 @@ The decision variable is the order quantity $Q \gt 0$. Over a year,
 - the average inventory is $Q/2$, so holding costs $h Q / 2$;
 - purchasing costs $cD$, which does not depend on $Q$ and can be ignored.
 
-The annual cost to minimise is therefore
+The annual cost to minimize is therefore
 $$
 C(Q) = \frac{K D}{Q} + \frac{h Q}{2} .
 $$
@@ -33,7 +33,7 @@ C'(Q) = -\frac{K D}{Q^2} + \frac{h}{2} = 0 .
 $$
 
 <Result name="Economic order quantity">
-The cost-minimising order quantity and the resulting annual cost are
+The cost-minimizing order quantity and the resulting annual cost are
 $$
 Q^* = \sqrt{\frac{2 K D}{h}}, \qquad C(Q^*) = \sqrt{2 K D h} .
 $$
@@ -80,7 +80,7 @@ The expected cost of mismatch is
 $$
 G(Q) = c_o\, \mathbb{E}\big[(Q - X)^+\big] + c_u\, \mathbb{E}\big[(X - Q)^+\big],
 $$
-where $a^+ = \max\{a, 0\}$, and maximising expected profit is equivalent to minimising $G$.
+where $a^+ = \max\{a, 0\}$, and maximizing expected profit is equivalent to minimizing $G$.
 
 **Marginal analysis.** Increase $Q$ by one small unit. With probability $F(Q)$ demand falls short of $Q$, the extra unit is left over, and we lose $c_o$. With probability $1 - F(Q)$ demand exceeds $Q$, the extra unit is sold, and we save $c_u$. Formally,
 $$
@@ -89,7 +89,7 @@ $$
 This is increasing in $Q$, so $G$ is convex, and the optimum is where the derivative vanishes.
 
 <Result name="Critical ratio">
-For continuous demand, the expected-profit-maximising order quantity satisfies
+For continuous demand, the expected-profit-maximizing order quantity satisfies
 $$
 F(Q^*) = \frac{c_u}{c_u + c_o} .
 $$
@@ -160,7 +160,7 @@ The example shows the steep cost of high service levels: the last few percentage
 
 - **Multi-echelon inventory.** Stock is held at several levels — a central warehouse feeding regional depots feeding stores — and the question is where safety stock is most effective. Holding it centrally pools demand variability across locations.
 - **Multiple items.** Items share a budget, warehouse space or a joint ordering cost; Lagrangian methods adjust each item's EOQ or service level.
-- **Perishability and obsolescence.** Food, blood and medicines expire; fashion and electronics lose value quickly. These push towards newsvendor-type models.
+- **Perishability and obsolescence.** Food, blood and medicines expire; fashion and electronics lose value quickly. These push toward newsvendor-type models.
 - **Dynamic programming.** Time-varying demand, capacity limits and non-stationary costs are handled by stochastic dynamic programming, which is also how the optimality of base-stock and (s, S) policies is proved.
 - **Demand learning.** In practice the demand distribution is itself estimated from data, often censored by stockouts — sales are observed, but lost demand is not.
 

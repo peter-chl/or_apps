@@ -1,4 +1,4 @@
-An airline flight has a fixed number of seats, and an empty seat at departure is worth nothing. The airline sells the same seat at several prices: cheap fares with restrictions, bought weeks in advance by leisure travellers, and expensive flexible fares, bought close to departure by business travellers. If it sells too many cheap seats it turns away high-paying customers later; if it holds back too many, the plane leaves with empty seats. How many seats should be kept for the late, high-fare demand?
+An airline flight has a fixed number of seats, and an empty seat at departure is worth nothing. The airline sells the same seat at several prices: cheap fares with restrictions, bought weeks in advance by leisure travelers, and expensive flexible fares, bought close to departure by business travelers. If it sells too many cheap seats it turns away high-paying customers later; if it holds back too many, the plane leaves with empty seats. How many seats should be kept for the late, high-fare demand?
 
 This is **revenue management** (RM), also called yield management. It grew up in the airline industry after deregulation and is now used wherever capacity is fixed and perishable and customers can be segmented: hotels, car rental, rail, cruises, event tickets, cloud computing. RM does not usually set the prices themselves — those come from marketing — but controls *availability*: which fare classes are open for sale at each moment.
 
@@ -127,7 +127,7 @@ Its unique optimal solution is $x_{AB} = 70$, $x_{BC} = 70$, $x_{AC} = 30$, with
 </Example>
 
 <Remark>
-Bid prices are static approximations. As departure approaches and the remaining demand shrinks, the value of a seat falls, so bid prices should be re-computed from updated forecasts. Better approximations — randomised LPs, dynamic programming decompositions by leg — refine the bid prices, but the DLP remains the conceptual starting point.
+Bid prices are static approximations. As departure approaches and the remaining demand shrinks, the value of a seat falls, so bid prices should be re-computed from updated forecasts. Better approximations — randomized LPs, dynamic programming decompositions by leg — refine the bid prices, but the DLP remains the conceptual starting point.
 </Remark>
 
 ## Overbooking

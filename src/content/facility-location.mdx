@@ -60,7 +60,7 @@ Sometimes the number of facilities is fixed by policy or budget rather than pric
 $$
 \min \; \sum_{i} \sum_{j} c_{ij}\, x_{ij} \quad \text{s.t.} \quad \sum_{i} x_{ij} = 1 \;\; \forall j, \quad x_{ij} \le y_i \;\; \forall i, j, \quad \sum_{i} y_i = p, \quad y_i \in \{0,1\} .
 $$
-Here $c_{ij}$ is usually demand-weighted distance, so the objective is total (equivalently, average) distance travelled. It is the classical model for siting public services such as clinics or fire stations.
+Here $c_{ij}$ is usually demand-weighted distance, so the objective is total (equivalently, average) distance traveled. It is the classical model for siting public services such as clinics or fire stations.
 
 ## Solution methods
 
@@ -77,7 +77,7 @@ The problem now separates by site. For each $i$, if site $i$ is open it serves e
 $$
 f_i + \sum_{j} \min\{0,\, c_{ij} - \lambda_j\} \lt 0 .
 $$
-Each evaluation of $L(\lambda)$ is therefore trivial, and $L(\lambda)$ is a lower bound for every $\lambda$. Maximising it over $\lambda$ (by subgradient optimisation, say) gives the Lagrangian dual bound, which for this relaxation equals the strong LP bound. The subproblem solutions also suggest which sites to open, and are easily repaired into feasible solutions — a useful source of good upper bounds.
+Each evaluation of $L(\lambda)$ is therefore trivial, and $L(\lambda)$ is a lower bound for every $\lambda$. Maximizing it over $\lambda$ (by subgradient optimization, say) gives the Lagrangian dual bound, which for this relaxation equals the strong LP bound. The subproblem solutions also suggest which sites to open, and are easily repaired into feasible solutions — a useful source of good upper bounds.
 
 **Heuristics.** For very large instances, or inside other algorithms, simple heuristics are effective:
 
@@ -137,6 +137,6 @@ Real network design models build on this core in several directions:
 - **Multiple products and modes.** Different products share sites but have different demand patterns and transport costs.
 - **Dynamic location.** Sites are opened and closed over a planning horizon as demand evolves, with costs for changing the network.
 - **Uncertainty.** Demand and costs are uncertain when sites are chosen, but assignments can adapt once they are known — a natural two-stage stochastic program.
-- **Covering models.** Instead of minimising cost, require every customer to be within a given distance or time of an open site (set covering), or cover as much demand as possible with $p$ sites (maximal covering). These are common for emergency services.
+- **Covering models.** Instead of minimizing cost, require every customer to be within a given distance or time of an open site (set covering), or cover as much demand as possible with $p$ sites (maximal covering). These are common for emergency services.
 
 Further reading: Daskin, *Network and Discrete Location*; Wolsey, *Integer Programming*, for the role of formulation strength; and Laporte, Nickel and Saldanha da Gama (eds.), *Location Science*.

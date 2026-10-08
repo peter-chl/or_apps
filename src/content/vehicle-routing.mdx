@@ -1,20 +1,20 @@
-Every morning a depot dispatches a fleet of vans to deliver to a list of customers. Each van has a limited capacity, each customer has an order of known size, and travelling between any two locations takes a known distance or time. Which customers should each van visit, and in what order, so that every order is delivered and the total distance driven is as small as possible?
+Every morning a depot dispatches a fleet of vans to deliver to a list of customers. Each van has a limited capacity, each customer has an order of known size, and traveling between any two locations takes a known distance or time. Which customers should each van visit, and in what order, so that every order is delivered and the total distance driven is as small as possible?
 
-This is the **vehicle routing problem** (VRP). It combines two hard problems — partitioning customers among vehicles, and sequencing the stops of each vehicle — and it is one of the most heavily studied problems in combinatorial optimisation. It is also one of the most commercially important: routing software plans the daily work of parcel carriers, grocery deliveries, waste collection and field-service engineers. We start with its one-vehicle core, the travelling salesman problem.
+This is the **vehicle routing problem** (VRP). It combines two hard problems — partitioning customers among vehicles, and sequencing the stops of each vehicle — and it is one of the most heavily studied problems in combinatorial optimization. It is also one of the most commercially important: routing software plans the daily work of parcel carriers, grocery deliveries, waste collection and field-service engineers. We start with its one-vehicle core, the traveling salesman problem.
 
 ## The decision
 
 We have a depot, node $0$, and customers $1, \dots, n$. Let $V = \{0, 1, \dots, n\}$.
 
-- Travelling from node $i$ to node $j$ costs $c_{ij}$ (distance, time or money). We assume costs are **symmetric**, $c_{ij} = c_{ji}$, and satisfy the triangle inequality, as road distances roughly do.
+- Traveling from node $i$ to node $j$ costs $c_{ij}$ (distance, time or money). We assume costs are **symmetric**, $c_{ij} = c_{ji}$, and satisfy the triangle inequality, as road distances roughly do.
 - Customer $i$ has demand $q_i$.
 - A fleet of identical vehicles, each with capacity $Q$, is based at the depot.
 
 A **route** is a cycle that starts at the depot, visits some customers and returns. The decision is a set of routes that together visit every customer exactly once, with the total demand on each route at most $Q$.
 
-## The travelling salesman problem
+## The traveling salesman problem
 
-With a single vehicle of unlimited capacity, the problem is to find the shortest cycle through all nodes: the **travelling salesman problem** (TSP). Let $x_{ij} \in \{0, 1\}$ equal $1$ if the tour travels directly from $i$ to $j$ (for $i \ne j$).
+With a single vehicle of unlimited capacity, the problem is to find the shortest cycle through all nodes: the **traveling salesman problem** (TSP). Let $x_{ij} \in \{0, 1\}$ equal $1$ if the tour travels directly from $i$ to $j$ (for $i \ne j$).
 
 <Definition name="TSP, Dantzig–Fulkerson–Johnson formulation">
 
@@ -77,7 +77,7 @@ which is non-negative under the triangle inequality.
 
 </Definition>
 
-The rule "both must be endpoints" ensures that a merge simply joins two paths end to end; an interior customer already has both of its neighbours fixed.
+The rule "both must be endpoints" ensures that a merge simply joins two paths end to end; an interior customer already has both of its neighbors fixed.
 
 ### Local search and 2-opt
 
@@ -87,7 +87,7 @@ c_{ac} + c_{bd} \lt c_{ab} + c_{cd} .
 $$
 With Euclidean distances, any tour with two crossing edges can be improved this way, so a 2-opt-optimal tour has no crossings. For multi-vehicle problems, further moves relocate a customer to another route, swap customers between routes, or exchange route tails.
 
-Local search stops at a local optimum. **Metaheuristics** — simulated annealing, tabu search, large neighbourhood search (destroy part of the solution and repair it), and genetic algorithms — escape local optima in a controlled way, and the best of them find solutions within a fraction of a per cent of optimal on standard benchmark instances.
+Local search stops at a local optimum. **Metaheuristics** — simulated annealing, tabu search, large neighborhood search (destroy part of the solution and repair it), and genetic algorithms — escape local optima in a controlled way, and the best of them find solutions within a fraction of a percent of optimal on standard benchmark instances.
 
 ## Worked example
 
@@ -149,11 +149,11 @@ The ordering of the savings list matters. Ties are common with integer distances
 
 The CVRP is the core of a large family of models. Real deployments typically add some of the following:
 
-- **Time windows (VRPTW).** Customer $i$ must be served within an interval $[a_i, b_i]$, and service takes time. A vehicle arriving early waits; arriving late is infeasible (or penalised). Time windows make even finding a feasible solution non-trivial and dominate many practical applications, from grocery delivery slots to scheduled maintenance visits.
+- **Time windows (VRPTW).** Customer $i$ must be served within an interval $[a_i, b_i]$, and service takes time. A vehicle arriving early waits; arriving late is infeasible (or penalized). Time windows make even finding a feasible solution non-trivial and dominate many practical applications, from grocery delivery slots to scheduled maintenance visits.
 - **Heterogeneous fleets** with different capacities and costs, and limits on route duration or driver working hours.
 - **Pickup and delivery.** Goods or passengers are collected at one location and delivered to another on the same route, with precedence and capacity constraints along the way — the basis of dial-a-ride and ride-sharing.
 - **Multiple depots and multiple trips**, in which a vehicle may return to reload during the day.
-- **Dynamic and stochastic routing.** New orders arrive during the day, and travel times vary with traffic, so routes are re-optimised on the fly.
+- **Dynamic and stochastic routing.** New orders arrive during the day, and travel times vary with traffic, so routes are re-optimized on the fly.
 - **Location-routing.** Depot locations and routes are chosen together, combining this lecture with facility location.
 
 Further reading: Toth and Vigo (eds.), *Vehicle Routing: Problems, Methods, and Applications*; Applegate, Bixby, Chvátal and Cook, *The Traveling Salesman Problem: A Computational Study*.

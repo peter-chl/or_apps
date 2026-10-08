@@ -20,7 +20,7 @@ export const parts: Part[] = [
         slug: "introduction",
         title: "What Is Operations Research?",
         summary:
-          "The modelling cycle, the core toolkit, and how the rest of these notes are organised.",
+          "The modeling cycle, the core toolkit, and how the rest of these notes are organized.",
       },
     ],
   },
@@ -64,9 +64,9 @@ export const parts: Part[] = [
       },
       {
         slug: "call-centers",
-        title: "Call Centre Staffing",
+        title: "Call Center Staffing",
         summary:
-          "Sizing a call centre with the Erlang C queue, service-level targets, and the square-root staffing rule.",
+          "Sizing a call center with the Erlang C queue, service-level targets, and the square-root staffing rule.",
       },
     ],
   },
@@ -81,9 +81,9 @@ export const parts: Part[] = [
       },
       {
         slug: "portfolio",
-        title: "Portfolio Optimisation",
+        title: "Portfolio Optimization",
         summary:
-          "Trading off risk against return with Markowitz's mean–variance model, and minimising tail risk with CVaR as a linear program.",
+          "Trading off risk against return with Markowitz's mean–variance model, and minimizing tail risk with CVaR as a linear program.",
       },
     ],
   },

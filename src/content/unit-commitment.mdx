@@ -133,12 +133,12 @@ So far the grid has been a single "copper plate". In reality power flows over tr
 The dual of the balance constraint at bus $i$ is the **locational marginal price** (LMP) at $i$: the cost of supplying one more MW there. If no line is congested, all LMPs are equal to the system marginal price. When a line hits its limit, cheap power cannot reach some buses, more expensive local units must run, and prices separate: the LMP difference across a congested line is the value of its scarce capacity.
 
 <Remark>
-Several organised day-ahead electricity markets clear by solving a security-constrained unit commitment — the model above extended with a DC network and contingency constraints — as a large MIP, then compute prices from the dispatch LP with the commitment fixed, much as in the worked example. The details of formulation, pricing and uplift differ from market to market.
+Several organized day-ahead electricity markets clear by solving a security-constrained unit commitment — the model above extended with a DC network and contingency constraints — as a large MIP, then compute prices from the dispatch LP with the commitment fixed, much as in the worked example. The details of formulation, pricing and uplift differ from market to market.
 </Remark>
 
 ## Extensions
 
-- **Uncertainty.** Wind and solar output and demand are uncertain. **Stochastic unit commitment** optimises commitment against a set of scenarios, and **robust unit commitment** against an uncertainty set; both reduce the need for fixed reserve margins at the cost of much larger models.
+- **Uncertainty.** Wind and solar output and demand are uncertain. **Stochastic unit commitment** optimizes commitment against a set of scenarios, and **robust unit commitment** against an uncertainty set; both reduce the need for fixed reserve margins at the cost of much larger models.
 - **Storage and hydro.** Batteries and reservoirs link periods through state-of-charge constraints; hydro scheduling adds water balances and cascades of reservoirs, and is often handled by stochastic dynamic programming over seasons.
 - **Nonlinear costs.** Real fuel curves are convex quadratic or non-convex with valve-point effects; they are usually approximated by piecewise-linear functions inside the MIP.
 - **AC power flow.** The full AC equations are non-convex. Optimal power flow with AC physics is solved by nonlinear programming or convex relaxations, normally after commitment has been fixed.
