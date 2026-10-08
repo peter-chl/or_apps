@@ -104,6 +104,17 @@ export const parts: Part[] = [
       },
     ],
   },
+  {
+    title: "Computing & AI Systems",
+    lectures: [
+      {
+        slug: "ai-serving",
+        title: "Serving AI Models",
+        summary:
+          "Placing Mixture-of-Experts models on GPUs as expert load shifts: a convex relaxation, rounding guarantees, and online competitive analysis.",
+      },
+    ],
+  },
 ];
 
 export interface NumberedLecture extends Lecture {

@@ -1,0 +1,171 @@
+Large AI models are expensive to run, and they are run a lot. Once a model has been trained, every user request has to be served on a fleet of GPUs that is costly to buy, scarce, and shared by many requests at once. How many GPUs to provision, which requests to batch together, and where to place the pieces of a model across the hardware are all resource-allocation decisions under uncertainty — exactly the kind of problem operations research was built for.
+
+This lecture surveys the decisions involved and then works through one of them in depth: placing the experts of a **Mixture-of-Experts** (MoE) model on GPUs as their popularity shifts over time. The model and results in the second half follow the recent paper of Huang, Lou and Xiao, *Mixture-of-Experts Serving* (arXiv:2607.17880, 2026), which brings competitive analysis and approximation algorithms to the problem.
+
+## The decisions in AI serving
+
+Serving a language model involves several layers of decisions, each recognizable from earlier lectures.
+
+- **Capacity.** How many GPUs to keep running for a given request rate and latency target. This is a staffing problem: GPUs play the role of agents, requests the role of calls, and the trade-off between utilization and waiting time is the one quantified by the Erlang C model in the call centre lecture.
+- **Scheduling and batching.** A GPU is most efficient when it processes many requests together, so requests are grouped into batches and advanced one generated token at a time. Two features make this harder than classical scheduling: a request's output length is not known when it arrives, and the memory it needs (its *key–value cache*) grows as it generates. Classical scheduling theory studied batching and unknown job lengths separately; recent theoretical work studies them together with growing memory use.
+- **Placement.** Which parts of the model live on which GPUs. For Mixture-of-Experts models, an architecture used by several prominent recent language models, this is the problem studied in the rest of this lecture.
+
+<Remark>
+The common thread is that AI serving decisions are made *online*: requests arrive continuously, demand shifts by time of day and application, and the system must commit before it sees the future. That is why competitive analysis — comparing an online policy with the best policy in hindsight — is the natural yardstick here, rather than the expected-cost criterion used in the inventory lecture.
+</Remark>
+
+## Mixture-of-Experts models
+
+A dense language model uses every parameter for every token. A **Mixture-of-Experts** model instead contains many *expert* sub-networks and a router that sends each token to only one or a few of them. Total capacity can grow with the number of experts while the computation per token stays small. Huang, Lou and Xiao cite DeepSeek-V3 as an example: it activates 37 billion of its 671 billion parameters per token.
+
+Sparsity makes the model cheap per token, but it reshapes the serving problem. The load is no longer spread evenly; it is routed through experts whose popularity varies across application domains and drifts over time. The paper reports that DeepSeek-V3's decoding stage places its 256 routed experts on 320 GPUs — one expert per GPU, with the remaining 64 GPUs holding redundant copies of the busiest experts — and that the deployment recomputes this placement periodically (for example every ten minutes) from recently observed load using simple heuristics.
+
+Two costs pull in opposite directions:
+
+- **Latency.** The time to finish a step is set by the most heavily loaded expert relative to the GPUs serving it. Adding copies of a busy expert reduces it.
+- **Reconfiguration.** Moving a GPU from one expert to another means copying weights, warming caches and other overhead. Reallocating too often wastes this effort, especially if the load shifts back.
+
+## Formulation
+
+Consider $m$ experts served on $n > m$ GPUs over time steps $t = 1, \dots, T$. Every expert must always have at least one GPU, so the first $m$ GPUs are assigned one per expert and the decision concerns the remaining
+$$
+k = n - m
+$$
+**extra GPUs**. At each step the system observes a workload vector $r_t = (r_{t,1}, \dots, r_{t,m})$, where $r_{t,i} \ge 0$ is the volume of requests routed to expert $i$, and then chooses a configuration $x_t \in \mathbb{Z}_{\ge 0}^m$, where $x_{t,i}$ is the number of extra GPUs given to expert $i$, with
+$$
+\sum_{i=1}^{m} x_{t,i} = k .
+$$
+
+<Definition name="Latency and reconfiguration cost">
+Expert $i$ is served by $1 + x_{t,i}$ GPUs, so it finishes its workload in time proportional to $r_{t,i}/(1 + x_{t,i})$, and the step is complete when the slowest expert finishes. The **latency cost** of step $t$ is
+$$
+f_t(x_t) = \max_{i} \frac{r_{t,i}}{1 + x_{t,i}} .
+$$
+The **reconfiguration cost** of moving from $x_{t-1}$ to $x_t$ is the $L_1$ distance $\sum_i |x_{t,i} - x_{t-1,i}|$. Moving one GPU from one expert to another therefore costs 2. The initial configuration $x_0$ is given.
+</Definition>
+
+The **dynamic MoE serving** problem is
+$$
+\min_{x_1, \dots, x_T} \; \sum_{t=1}^{T} \Big( f_t(x_t) + \sum_{i=1}^{m} |x_{t,i} - x_{t-1,i}| \Big)
+\quad \text{s.t.} \quad \sum_i x_{t,i} = k, \; x_t \in \mathbb{Z}^m_{\ge 0} .
+$$
+In the **static** variant, reconfiguration is forbidden: a single configuration $x$ is used throughout, and the objective is $\sum_t f_t(x)$.
+
+The model deliberately abstracts away hardware details — communication, shared experts, batching — to isolate the central tension: putting more GPUs on currently busy experts reduces latency, but frequent reallocation is itself costly.
+
+### Convex relaxation
+
+Allowing $x_t$ to be real-valued gives a convex program. Each $f_t$ is a maximum of convex functions of $x_t$, hence convex. To linearize the reconfiguration term, introduce $y_{t,i} \ge x_{t,i} - x_{t-1,i}$, the GPUs *added* to expert $i$ at step $t$. Because the total is fixed at $k$, GPUs added equal GPUs removed, so $\sum_i y_{t,i}$ is half the reconfiguration cost:
+$$
+\begin{aligned}
+\min \quad & \sum_{t} f_t(x_t) + \sum_t \sum_i y_{t,i} \\
+\text{s.t.} \quad & \textstyle\sum_i x_{t,i} \le k && \forall t \\
+& y_{t,i} \ge x_{t,i} - x_{t-1,i} && \forall t, i \\
+& x_{t,i}, \, y_{t,i} \ge 0 .
+\end{aligned}
+$$
+(The factor of 2 is dropped, which changes constants only.) Its optimal value is a lower bound on the integer optimum, and its dual — built with Fenchel conjugates of the $f_t$ — drives the online analysis below, much as LP duality priced routes in the transportation problem.
+
+## The static problem
+
+With a fixed configuration the problem is a resource allocation: split $k$ GPUs among $m$ experts to minimize total latency over a known workload history.
+
+<Result name="Static MoE serving (Huang, Lou and Xiao)">
+
+1. Solving the convex relaxation and **rounding each $x_i^\ast$ down**, then assigning the leftover GPUs arbitrarily, is a **2-approximation**. The reason is that $1 + x \le 2(1 + \lfloor x \rfloor)$, so rounding down at most doubles each expert's latency term.
+2. This is the best possible from the relaxation: its **integrality gap** is at least $2 - 1/m$.
+3. The static problem is **NP-hard**, by reduction from the densest $k$-subgraph problem, and assuming the Exponential Time Hypothesis it has **no FPTAS**.
+
+</Result>
+
+The integrality gap instance is simple. Take $m$ experts, $k = m - 1$ extra GPUs, one step, and equal workload $r_{1,i} = 1$. The relaxation spreads the budget evenly, $x_i = 1 - 1/m$, for latency $m/(2m - 1)$. Any integer configuration must leave some expert with no extra GPU, giving latency 1. The ratio $(2m-1)/m$ tends to 2.
+
+The hardness reduction is also instructive. Make one expert per vertex of a graph and one time step per edge $(u, v)$, with workload 2 on experts $u$ and $v$ and 1 elsewhere. Giving extra GPUs to a set $S$ of $k$ experts makes step $(u, v)$ cost 1 if both endpoints are in $S$, and 2 otherwise. The total cost is $2|E| - |E(S)|$, so minimizing it means finding the $k$ vertices that induce the most edges.
+
+<Example name="Static placement">
+
+Three experts share $k = 3$ extra GPUs (6 GPUs in all) over four steps with workloads
+
+| Step | $r_{t,1}$ | $r_{t,2}$ | $r_{t,3}$ |
+| --- | --- | --- | --- |
+| 1 | 6 | 2 | 1 |
+| 2 | 5 | 3 | 1 |
+| 3 | 2 | 6 | 1 |
+| 4 | 4 | 4 | 2 |
+
+Enumerating all ten configurations, the best integer configuration is $x = (2, 1, 0)$. Its per-step latencies are $\max(6/3, 2/2, 1/1) = 2$, then $5/3$, $3$ and $2$, for a total of $26/3 \approx 8.67$. The even split $(1, 1, 1)$ costs $10.5$, and the next best, $(1, 2, 0)$, costs $9.5$.
+
+The convex relaxation has optimum approximately $x^\ast = (1.77, 1.15, 0.08)$ with value $8.615$, a lower bound on what any configuration can achieve. Rounding down gives $(1, 1, 0)$ with one GPU left over. Depending on where it goes, the result is $(2, 1, 0)$ at $8.67$, $(1, 2, 0)$ at $9.5$, or $(1, 1, 1)$ at $10.5$ — all comfortably inside the guarantee $2 \times 8.615 = 17.23$, and the best of them is optimal.
+
+</Example>
+
+## The dynamic problem online
+
+In practice the workload is not known in advance. An **online** algorithm sees $r_t$ and must choose $x_t$ before $r_{t+1}$ is revealed.
+
+<Definition name="Competitive ratio">
+An online algorithm is **$\Gamma$-competitive** if, for every workload sequence, its expected cost satisfies
+$$
+\mathbb{E}[\text{ALG}] \le \Gamma \cdot \text{OPT} + C ,
+$$
+where OPT is the cost of the best schedule chosen with full knowledge of the future, and $C$ may depend on $m$ and $k$ but not on the horizon $T$.
+</Definition>
+
+Two naive policies show why the problem is subtle. **Never reconfiguring** pays nothing to move but cannot follow lasting shifts in load. **Chasing** the load — each step choosing the configuration that is best for the current workload alone — follows every shift but pays to move on every short-lived spike, and pays again when the load returns. This is the same tension as in caching and paging, metrical task systems, and the ski-rental problem: commit too early and you may waste the switch, too late and you keep paying for the old state.
+
+### Regularized greedy
+
+The algorithm of Huang, Lou and Xiao works in two stages: compute a fractional configuration online, then round it online.
+
+<Definition name="Regularized greedy">
+At each step, choose the fractional configuration that minimizes the current latency plus a penalty for moving away from the previous configuration, measured by relative entropy:
+$$
+x_t = \arg\min_{x \ge 0,\; \sum_i x_i = k} \; \Big( f_t(x) + \sum_i (x_i + 1) \ln \frac{x_i + 1}{x_{t-1,i} + 1} \Big) .
+$$
+</Definition>
+
+The entropy penalty is the key design choice. Moving GPUs toward an expert that already has many is cheap in relative terms, while stripping an expert down to its last GPU is expensive. The update therefore behaves multiplicatively, which hedges against load that may soon swing back.
+
+The analysis is an **online primal–dual** argument. The optimality conditions of each update step are used to construct a feasible solution of the dual of the convex relaxation, step by step. Since any dual feasible solution bounds OPT from below, comparing the algorithm's cost with that dual value bounds the competitive ratio. Applied directly, standard techniques of this kind give a ratio of order $\log k$. The paper improves this by exploiting two properties of the latency function: it is *smooth* (giving an expert $\theta$ times as many GPUs reduces its latency by at most a factor of $\theta$), and its conjugate is *sublinear* in a way that converts the loss into a square root.
+
+### Online rounding
+
+The fractional schedule is converted into whole GPUs by **lazy threshold rounding**: draw a random threshold $\theta_i \in [0, 1)$ for each expert once at the start; at each step give expert $i$ at least $\max\{0, \lfloor x_{t,i} - \theta_i \rfloor\}$ GPUs, and otherwise keep the previous integer allocation wherever possible. Because the thresholds are fixed, an expert only gains a GPU when its fractional allocation crosses a new threshold, so the expected movement is no larger than the fractional movement. Smoothness again ensures the rounded latency is at most 3 times the fractional latency.
+
+<Result name="Dynamic MoE serving (Huang, Lou and Xiao)">
+
+1. There is a polynomial-time online algorithm for dynamic MoE serving that is **$O(\sqrt{\log k})$-competitive**, where $k$ is the number of extra GPUs.
+2. No online algorithm for the **dual problem** underlying this primal–dual analysis can be better than $\tfrac{1}{32}\sqrt{\ln k}$-competitive, so the analysis is tight for this approach. Whether the primal problem itself admits a better ratio is open.
+3. Offline, solving the convex relaxation with full knowledge and rounding it gives a polynomial-time **constant-factor approximation**.
+
+</Result>
+
+The lower bound has a natural interpretation. In the dual, demand keeps arriving for a single expert for an unknown number of steps, and the algorithm must decide how much dual "budget" to commit at each step, with diminishing returns. The offline benchmark knows when the burst ends and spreads the budget evenly; the online algorithm must overcommit early to stay competitive in case the burst is short. That forced overcommitment costs a $\sqrt{\log k}$ factor.
+
+## Worked example
+
+<Example name="Spikes versus shifts">
+
+Two experts share $k = 4$ extra GPUs, starting from the even split $x_0 = (2, 2)$. Over ten steps the workload is $(24, 4)$ for three steps, a one-step spike of $(4, 24)$, $(24, 4)$ for two more steps, and then a lasting shift to $(4, 24)$ for four steps. Recall that moving one GPU costs 2.
+
+| Policy | Configurations | Latency | Reconfiguration | Total |
+| --- | --- | --- | --- | --- |
+| Never move | $(2,2)$ throughout | 80.0 | 0 | 80.0 |
+| Chase the load | $(4,0)$ or $(0,4)$, whichever is busier | 48.0 | 28 | 76.0 |
+| Myopic greedy | $(2,2)$, dipping to $(1,3)$ when expert 2 is busy | 70.0 | 6 | 76.0 |
+| Optimal in hindsight | $(3,1)^{3}$, $(2,2)^{3}$, $(0,4)^{4}$ | 61.2 | 8 | 69.2 |
+
+Here *myopic greedy* minimizes current latency plus the cost of moving from the previous step, with no regard for the future. All totals were computed exactly; the optimum by dynamic programming over the five possible configurations.
+
+</Example>
+
+The example shows each failure mode. Chasing gets the lowest latency but spends 28 on moves, most of them reacting to the one-step spike and then undoing the reaction. Myopic greedy is too timid: a move only pays off over several steps, so judged one step at a time it rarely looks worthwhile. The hindsight optimum leans toward expert 1 early, then — knowing that a long shift is coming — moves to the even split at the spike and stays there, and moves fully to expert 2 only when the lasting shift begins. An online algorithm cannot know the spike from the shift when it happens; the competitive ratio measures how much that ignorance must cost in the worst case.
+
+## Extensions and open questions
+
+- **Closing the gap.** The $\sqrt{\log k}$ barrier is proved for the dual problem used in the analysis. Whether a different technique can beat it for MoE serving itself is open.
+- **Richer models.** Real deployments add communication costs between GPUs, experts of different sizes, memory limits, and the batching and key–value cache constraints from the first section. Each breaks some structure the analysis relies on.
+- **Predictions.** Expert load is partly predictable from recent history. Online algorithms that use predictions while remaining robust when they are wrong — *learning-augmented* algorithms — are a natural next step.
+- **Connections.** The ingredients are the same as in earlier lectures: a convex relaxation and its dual (transportation, unit commitment), rounding with a provable guarantee (facility location), and a hedge between reacting and waiting (inventory, revenue management).
+
+Source: Z. Huang, Q. Lou and T. Xiao, *Mixture-of-Experts Serving*, arXiv:2607.17880 (2026). For background on competitive analysis, see Borodin and El-Yaniv, *Online Computation and Competitive Analysis*.
