@@ -1,0 +1,142 @@
+A retailer is planning its distribution network. There are a handful of candidate sites for warehouses, each with an annual fixed cost if it is opened, and a set of stores that must each be supplied from some open warehouse. Opening more warehouses brings them closer to the stores and lowers transport cost, but every extra site adds a fixed cost. Which sites should be opened, and which store should each one serve?
+
+This is the **facility location problem**. It is the natural next step after the transportation problem: once the network itself is a decision, we need binary variables for the open-or-closed choices, and the model becomes a mixed-integer program. It is also the standard textbook example of a lesson that applies to all of integer programming — two formulations with exactly the same integer solutions can have very different LP relaxations, and the difference decides whether the model solves in a second or not at all.
+
+## The decision
+
+We have $m$ candidate sites indexed by $i$ and $n$ customers indexed by $j$.
+
+- Opening site $i$ costs $f_i$, regardless of how much it handles.
+- Serving the whole demand of customer $j$ from site $i$ costs $c_{ij}$. Typically $c_{ij} = d_j \cdot t_{ij}$, the customer's demand times a unit transport cost, but any non-negative cost will do.
+
+In the **uncapacitated** version an open site can serve any number of customers. The decision has two layers: which sites to open, and an assignment of customers to open sites. Once the set of open sites is fixed, the second layer is trivial — each customer goes to its cheapest open site — so all the difficulty lies in choosing the set.
+
+## Formulation
+
+Let $y_i \in \{0, 1\}$ equal $1$ if site $i$ is opened, and let $x_{ij} \ge 0$ be the fraction of customer $j$'s demand served from site $i$.
+
+<Definition name="Uncapacitated facility location (strong formulation)">
+
+$$
+\begin{aligned}
+\min_{x, y} \quad & \sum_{i=1}^{m} f_i\, y_i + \sum_{i=1}^{m} \sum_{j=1}^{n} c_{ij}\, x_{ij} \\
+\text{s.t.} \quad & \sum_{i=1}^{m} x_{ij} = 1, && j = 1, \dots, n \quad \text{(assignment)} \\
+& x_{ij} \le y_i, && i = 1, \dots, m, \; j = 1, \dots, n \quad \text{(linking)} \\
+& x_{ij} \ge 0, \quad y_i \in \{0, 1\} .
+\end{aligned}
+$$
+
+</Definition>
+
+The objective adds the fixed costs of the open sites to the cost of serving the customers. The **assignment** constraints say that each customer's demand is met in full. The **linking** constraints say that a customer can be served from site $i$ only if that site is open: when $y_i = 0$ they force $x_{ij} = 0$, and when $y_i = 1$ they are slack. There is no need to declare $x_{ij}$ binary — for fixed $y$, an optimal solution puts each customer entirely on its cheapest open site anyway.
+
+### Weak and strong formulations
+
+The $mn$ linking constraints can be replaced by just $m$ constraints, one per site:
+$$
+\sum_{j=1}^{n} x_{ij} \le n\, y_i, \qquad i = 1, \dots, m .
+$$
+This **aggregated** (or weak) form is obtained by adding up the disaggregated constraints $x_{ij} \le y_i$ over $j$. It is still a correct model: if $y_i = 0$ the left-hand side must be zero, and if $y_i = 1$ the constraint is slack because at most $n$ customers exist. The two formulations have exactly the same set of integer solutions.
+
+Their LP relaxations, obtained by replacing $y_i \in \{0,1\}$ with $0 \le y_i \le 1$, are very different. In the weak relaxation it is enough to open site $i$ to the extent $y_i = \tfrac{1}{n} \sum_j x_{ij}$, the fraction of customers it serves. A site serving one customer out of five need only be "one-fifth open" and pays one-fifth of its fixed cost. In the strong relaxation, serving even one customer fully forces $y_i = 1$.
+
+<Result name="Strength of the disaggregated formulation">
+Every point feasible for the strong LP relaxation is feasible for the weak one, but not conversely. Hence the strong LP bound is always at least as large as the weak one, and it is usually much larger. In practice the strong relaxation of the uncapacitated problem is often integral, or very nearly so.
+</Result>
+
+The bound matters because branch and bound prunes a node only when its LP bound is no better than the best known solution. A weak bound means a large gap, little pruning, and an exponentially large search tree. Having more constraints is not a drawback here: modern LP solvers handle the $mn$ linking constraints easily, and the tighter polyhedron more than pays for them.
+
+### The capacitated variant
+
+If site $i$ can handle at most $u_i$ units and customer $j$ demands $d_j$ units, we add
+$$
+\sum_{j=1}^{n} d_j\, x_{ij} \le u_i\, y_i, \qquad i = 1, \dots, m .
+$$
+This constraint also links $x$ and $y$, but it does not replace the disaggregated constraints: keeping $x_{ij} \le y_i$ alongside it still tightens the relaxation. With capacities, a customer may be split between sites (if $x_{ij}$ is continuous), or single sourcing can be required by declaring $x_{ij} \in \{0,1\}$, which makes the problem considerably harder.
+
+### The p-median problem
+
+Sometimes the number of facilities is fixed by policy or budget rather than priced through fixed costs. The **p-median** problem drops the fixed-cost term and adds a cardinality constraint:
+$$
+\min \; \sum_{i} \sum_{j} c_{ij}\, x_{ij} \quad \text{s.t.} \quad \sum_{i} x_{ij} = 1 \;\; \forall j, \quad x_{ij} \le y_i \;\; \forall i, j, \quad \sum_{i} y_i = p, \quad y_i \in \{0,1\} .
+$$
+Here $c_{ij}$ is usually demand-weighted distance, so the objective is total (equivalently, average) distance travelled. It is the classical model for siting public services such as clinics or fire stations.
+
+## Solution methods
+
+The uncapacitated problem is NP-hard, but instances with hundreds of sites and thousands of customers are routinely solved to optimality.
+
+**Branch and bound.** Solve the strong LP relaxation; if some $y_i$ is fractional, branch on it ($y_i = 0$ in one child, $y_i = 1$ in the other) and continue. Because the strong bound is so tight, the tree is typically small. Commercial and open-source MIP solvers add cutting planes and presolve on top.
+
+**Lagrangian relaxation.** Move the assignment constraints into the objective with multipliers $\lambda_j$:
+$$
+L(\lambda) = \min_{x, y} \; \sum_{i} f_i\, y_i + \sum_{i} \sum_{j} (c_{ij} - \lambda_j)\, x_{ij} + \sum_{j} \lambda_j
+\quad \text{s.t.} \quad 0 \le x_{ij} \le y_i, \; y_i \in \{0,1\} .
+$$
+The problem now separates by site. For each $i$, if site $i$ is open it serves exactly the customers with $c_{ij} - \lambda_j$ negative, so it is worth opening when
+$$
+f_i + \sum_{j} \min\{0,\, c_{ij} - \lambda_j\} \lt 0 .
+$$
+Each evaluation of $L(\lambda)$ is therefore trivial, and $L(\lambda)$ is a lower bound for every $\lambda$. Maximising it over $\lambda$ (by subgradient optimisation, say) gives the Lagrangian dual bound, which for this relaxation equals the strong LP bound. The subproblem solutions also suggest which sites to open, and are easily repaired into feasible solutions — a useful source of good upper bounds.
+
+**Heuristics.** For very large instances, or inside other algorithms, simple heuristics are effective:
+
+- *Greedy (add)*: start with no sites open; repeatedly open the site that reduces total cost the most; stop when no addition helps.
+- *Drop*: start with all sites open and repeatedly close the site whose closure saves the most.
+- *Interchange (local search)*: from any solution, try opening one site, closing one site, or swapping an open site for a closed one; accept any improving move and repeat until none exists.
+
+The heuristics give no guarantee of optimality on their own, but combined with a Lagrangian or LP lower bound they come with a certificate of how far from optimal they can be.
+
+## Worked example
+
+<Example name="Three sites, five customers">
+Fixed costs and service costs $c_{ij}$ are:
+
+|  | $C_1$ | $C_2$ | $C_3$ | $C_4$ | $C_5$ | Fixed cost $f_i$ |
+| --- | --- | --- | --- | --- | --- | --- |
+| Site $A$ | 4 | 9 | 14 | 18 | 22 | 8 |
+| Site $B$ | 12 | 5 | 6 | 11 | 15 | 10 |
+| Site $C$ | 20 | 15 | 9 | 4 | 6 | 12 |
+
+With three sites there are only seven non-empty sets to open, so we can enumerate them. For each set, every customer is assigned to its cheapest open site:
+
+| Open sites | Fixed cost | Service cost | Total |
+| --- | --- | --- | --- |
+| $A$ | 8 | 67 | 75 |
+| $B$ | 10 | 49 | 59 |
+| $C$ | 12 | 54 | 66 |
+| $A, B$ | 18 | 41 | 59 |
+| $A, C$ | 20 | 32 | **52** |
+| $B, C$ | 22 | 33 | 55 |
+| $A, B, C$ | 30 | 25 | 55 |
+
+The optimum opens $A$ and $C$, with $A$ serving $C_1, C_2$ and $C$ serving $C_3, C_4, C_5$, at total cost $52$.
+
+**The two LP relaxations.** The strong LP relaxation has optimal value $52$ and its optimal solution is exactly the integer optimum $y = (1, 0, 1)$: the relaxation alone solves the problem, with no branching.
+
+The weak LP relaxation has optimal value $35.4$. In it each site is opened only fractionally, in proportion to the customers it serves, so serving customer $j$ from site $i$ effectively costs $c_{ij} + f_i / 5$. With $f_i/5 = 1.6, 2, 2.4$, each customer picks its cheapest site, giving $y = (0.2, 0.4, 0.4)$ and cost
+$$
+(4 + 1.6) + (5 + 2) + (6 + 2) + (4 + 2.4) + (6 + 2.4) = 35.4 .
+$$
+The weak bound leaves a gap of $(52 - 35.4)/52 \approx 32\%$, which branch and bound would have to close by branching.
+
+**The greedy heuristic.** Greedy first opens the best single site, $B$ (cost $59$). Adding $C$ lowers the cost to $55$, and adding $A$ to that does not help ($55$ again), so greedy stops at $\{B, C\}$ with cost $55$. One interchange move — swap $B$ for $A$ — reaches the optimum $\{A, C\}$. Greedy was misled by its first choice: $B$ is the best site on its own, but not part of the best pair.
+
+**p-median.** Dropping fixed costs and requiring $p = 2$ open sites, the best pair is again $\{A, C\}$, with service cost $32$; for $p = 1$ it is $\{B\}$, with service cost $49$.
+</Example>
+
+<Remark>
+The example is small, but the pattern is typical. The weak relaxation rewards "spreading thin" across many partly open sites; the strong one does not. When writing any MIP with big-$M$ or aggregated linking constraints, it is worth asking whether a disaggregated version is available.
+</Remark>
+
+## Extensions
+
+Real network design models build on this core in several directions:
+
+- **Multi-echelon networks.** Plants supply warehouses, which supply stores; both layers may be located, and flows between them are transportation problems.
+- **Multiple products and modes.** Different products share sites but have different demand patterns and transport costs.
+- **Dynamic location.** Sites are opened and closed over a planning horizon as demand evolves, with costs for changing the network.
+- **Uncertainty.** Demand and costs are uncertain when sites are chosen, but assignments can adapt once they are known — a natural two-stage stochastic program.
+- **Covering models.** Instead of minimising cost, require every customer to be within a given distance or time of an open site (set covering), or cover as much demand as possible with $p$ sites (maximal covering). These are common for emergency services.
+
+Further reading: Daskin, *Network and Discrete Location*; Wolsey, *Integer Programming*, for the role of formulation strength; and Laporte, Nickel and Saldanha da Gama (eds.), *Location Science*.

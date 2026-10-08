@@ -1,0 +1,167 @@
+A shop sells a product that it buys from a supplier. If it orders too often it pays the fixed cost of placing and receiving an order again and again; if it orders too much at once it ties up cash and shelf space in stock that sits waiting to be sold. If demand is uncertain there is a second trade-off: too little stock means lost sales and unhappy customers, too much means leftovers that must be marked down or thrown away. How much should it order, and when?
+
+These are the questions of **inventory theory**. Its models are among the oldest in OR and among the most widely deployed: every retailer, manufacturer and hospital pharmacy runs some version of the policies in this lecture, often inside an ERP system that computes them automatically. We look at two foundational models — the economic order quantity for steady, known demand, and the newsvendor for a single period of uncertain demand — and then at the policies that combine the two ideas.
+
+## The decision
+
+An inventory policy answers two questions: **how much** to order, and **when** to order it. The relevant costs are:
+
+- an **ordering cost** $K$ per order, independent of its size (administration, transport, set-up of a production run);
+- a **purchase cost** $c$ per unit;
+- a **holding cost** $h$ per unit per unit of time, covering the cost of capital, storage, insurance and obsolescence — often expressed as a percentage of $c$ per year;
+- a **shortage cost** for demand that cannot be met from stock, either as a lost sale or as a backorder filled later.
+
+Which costs matter depends on the setting. With steady demand, the trade-off is between ordering and holding costs. With uncertain demand, it is between holding (or overage) and shortage costs.
+
+## The economic order quantity
+
+Assume demand occurs at a constant, known rate of $D$ units per year, replenishment is instantaneous, and no shortages are allowed. Then it is clearly optimal to order only when stock reaches zero, and to order the same quantity $Q$ each time. Inventory follows a sawtooth: it jumps to $Q$, falls linearly to zero over a cycle of length $Q/D$, and jumps back up.
+
+The decision variable is the order quantity $Q \gt 0$. Over a year,
+
+- the number of orders is $D/Q$, so ordering costs $K D / Q$;
+- the average inventory is $Q/2$, so holding costs $h Q / 2$;
+- purchasing costs $cD$, which does not depend on $Q$ and can be ignored.
+
+The annual cost to minimise is therefore
+$$
+C(Q) = \frac{K D}{Q} + \frac{h Q}{2} .
+$$
+The first term decreases in $Q$ and the second increases. $C$ is convex on $Q \gt 0$, so setting the derivative to zero gives the minimum:
+$$
+C'(Q) = -\frac{K D}{Q^2} + \frac{h}{2} = 0 .
+$$
+
+<Result name="Economic order quantity">
+The cost-minimising order quantity and the resulting annual cost are
+$$
+Q^* = \sqrt{\frac{2 K D}{h}}, \qquad C(Q^*) = \sqrt{2 K D h} .
+$$
+At $Q^*$ the annual ordering cost and the annual holding cost are equal, each $\tfrac{1}{2}\sqrt{2KDh}$.
+</Result>
+
+This is the **EOQ formula**, usually attributed to Harris (1913). Its most useful property is robustness. Dividing $C(Q)$ by $C(Q^*)$ gives
+$$
+\frac{C(Q)}{C(Q^*)} = \frac{1}{2}\left( \frac{Q}{Q^*} + \frac{Q^*}{Q} \right),
+$$
+which is very flat near $Q/Q^* = 1$. Ordering 25% more than optimal raises cost by only 2.5%. Equally, errors in the inputs are damped by the square root: if $K$ is overestimated by a factor of two, $Q^*$ is too large by a factor of $\sqrt{2} \approx 1.41$, and cost rises by about 6%. This is why EOQ works well in practice even though its assumptions rarely hold exactly.
+
+<Example name="EOQ">
+A shop sells $D = 1200$ units a year. Each order costs $K = 100$ to place, and holding one unit for a year costs $h = 6$. Then
+$$
+Q^* = \sqrt{\frac{2 \cdot 1200 \cdot 100}{6}} = \sqrt{40\,000} = 200,
+$$
+so the shop places $1200 / 200 = 6$ orders a year, one every two months. The annual cost is
+$$
+C(200) = \frac{100 \cdot 1200}{200} + \frac{6 \cdot 200}{2} = 600 + 600 = 1200 = \sqrt{2 \cdot 1200 \cdot 100 \cdot 6} .
+$$
+The cost curve is flat around the optimum:
+
+| Order quantity $Q$ | 150 | 200 | 250 | 300 | 400 |
+| --- | --- | --- | --- | --- | --- |
+| Annual cost $C(Q)$ | 1250 | 1200 | 1230 | 1300 | 1500 |
+| Relative to optimum | +4.2% | — | +2.5% | +8.3% | +25% |
+
+If the supplier only delivers in cases of 250, the penalty is $30$ a year.
+</Example>
+
+**Lead times.** If an order takes a known time $L$ to arrive, nothing changes except timing: place the order when the stock on hand equals the demand during the lead time, $r = DL$. This **reorder point** becomes important once demand is uncertain.
+
+## The newsvendor model
+
+Now consider a single selling period with uncertain demand. A newsvendor buys papers in the morning at cost $c$ each, sells them at price $p$, and can return unsold copies at the end of the day for a salvage value $v$, with $v \lt c \lt p$. Demand $X$ is a random variable with distribution function $F$. The decision is the order quantity $Q$, made before demand is known. The same structure fits fashion goods, perishable food, seasonal products, and capacity decisions in general.
+
+Two costs drive the decision:
+
+- the **underage cost** $c_u = p - c$, the profit lost on each unit of demand that goes unmet;
+- the **overage cost** $c_o = c - v$, the loss on each unit bought but not sold.
+
+The expected cost of mismatch is
+$$
+G(Q) = c_o\, \mathbb{E}\big[(Q - X)^+\big] + c_u\, \mathbb{E}\big[(X - Q)^+\big],
+$$
+where $a^+ = \max\{a, 0\}$, and maximising expected profit is equivalent to minimising $G$.
+
+**Marginal analysis.** Increase $Q$ by one small unit. With probability $F(Q)$ demand falls short of $Q$, the extra unit is left over, and we lose $c_o$. With probability $1 - F(Q)$ demand exceeds $Q$, the extra unit is sold, and we save $c_u$. Formally,
+$$
+G'(Q) = c_o\, F(Q) - c_u \big(1 - F(Q)\big) .
+$$
+This is increasing in $Q$, so $G$ is convex, and the optimum is where the derivative vanishes.
+
+<Result name="Critical ratio">
+For continuous demand, the expected-profit-maximising order quantity satisfies
+$$
+F(Q^*) = \frac{c_u}{c_u + c_o} .
+$$
+The right-hand side is the **critical ratio**, and $Q^*$ is the corresponding quantile of the demand distribution. For discrete demand, $Q^*$ is the smallest $Q$ with $F(Q) \ge c_u / (c_u + c_o)$.
+</Result>
+
+The critical ratio is the optimal probability of not running out. When underage is costly relative to overage (high margin, high salvage value), it is close to $1$ and we stock well above expected demand; when overage dominates, we stock below it. Ordering the mean demand is optimal only when $c_u = c_o$ and the distribution is symmetric.
+
+For normal demand with mean $\mu$ and standard deviation $\sigma$, $Q^* = \mu + z \sigma$, where $z = \Phi^{-1}\big(c_u / (c_u + c_o)\big)$ and $\Phi$ is the standard normal distribution function. The expected shortage at any $Q = \mu + z\sigma$ is $\sigma\, \mathcal{L}(z)$, where
+$$
+\mathcal{L}(z) = \varphi(z) - z\,\big(1 - \Phi(z)\big)
+$$
+is the standard normal **loss function** and $\varphi$ is the standard normal density. Expected leftovers are then $Q - \mu + \sigma\, \mathcal{L}(z)$.
+
+<Example name="Newsvendor with normal demand">
+A bakery sells a speciality cake for $p = 10$, which costs $c = 4$ to make; unsold cakes go to a food outlet for $v = 1$. Daily demand is approximately normal with $\mu = 500$ and $\sigma = 100$. Then
+$$
+c_u = 10 - 4 = 6, \qquad c_o = 4 - 1 = 3, \qquad \frac{c_u}{c_u + c_o} = \frac{6}{9} = \frac{2}{3} .
+$$
+The $2/3$ quantile of the standard normal distribution is $z = 0.4307$, so
+$$
+Q^* = 500 + 0.4307 \cdot 100 \approx 543 .
+$$
+With $\varphi(0.4307) = 0.3636$, the loss function is $\mathcal{L}(z) = 0.3636 - 0.4307 \cdot \tfrac{1}{3} = 0.2200$. Hence
+
+- expected shortage: $100 \cdot 0.2200 = 22.0$ cakes;
+- expected sales: $500 - 22.0 = 478.0$ cakes;
+- expected leftovers: $543.07 - 478.0 = 65.1$ cakes.
+
+Expected profit is $(p - c)\mu$ minus the expected cost of mismatch:
+$$
+6 \cdot 500 - (6 \cdot 22.0 + 3 \cdot 65.1) = 3000 - 327.2 = 2672.8 .
+$$
+Ordering the mean, $Q = 500$, gives expected shortage and leftovers of $100\,\varphi(0) = 39.9$ each, and expected profit $3000 - 9 \cdot 39.9 = 2641.0$. The value $3000$ is what perfect knowledge of demand would earn; the remaining $327$ is the cost of uncertainty, and the only way to reduce it further is to reduce $\sigma$ — better forecasting, or postponing production until demand is better known.
+</Example>
+
+<Remark>
+The probability of not running out, here $2/3$, is not the same as the fraction of demand met. The bakery meets $478.0 / 500 \approx 95.6\%$ of demand on average, even though it sells out on one day in three.
+</Remark>
+
+## Policies for repeated orders under uncertainty
+
+Most items are reordered repeatedly with uncertain demand and a positive lead time. Three policy classes dominate practice. In each, decisions are based on the **inventory position**: stock on hand plus stock on order minus backorders.
+
+- **Base-stock (order-up-to) policy.** At each review, order enough to raise the inventory position to a fixed level $S$. With periodic review, backordered demand and no fixed ordering cost, a base-stock policy is optimal, and $S$ is a newsvendor quantile of the demand over the lead time plus one review period.
+- **(s, S) policy.** At each review, if the inventory position is at or below $s$, order up to $S$; otherwise do nothing. With a fixed ordering cost, policies of this form are optimal under fairly general conditions. Roughly, $S - s$ plays the role of the EOQ and $s$ protects against lead-time demand.
+- **(Q, r) policy.** With continuous review, whenever the inventory position falls to the reorder point $r$, order a fixed quantity $Q$. A good approximation takes $Q$ from the EOQ formula and sets $r$ from the lead-time demand distribution.
+
+### Safety stock
+
+With uncertain demand, the reorder point is set above the expected lead-time demand. The excess is the **safety stock**. If demand over the lead time is normal with mean $\mu_L$ and standard deviation $\sigma_L$, and we want to avoid a stockout in each cycle with probability $\alpha$ (the **cycle service level**), then
+$$
+r = \mu_L + z_\alpha\, \sigma_L, \qquad \text{safety stock} = z_\alpha\, \sigma_L, \qquad z_\alpha = \Phi^{-1}(\alpha) .
+$$
+If demand per period is independent with standard deviation $\sigma$ and the lead time is $L$ periods, then $\sigma_L = \sigma\sqrt{L}$: safety stock grows with the square root of the lead time, not linearly.
+
+<Example name="Safety stock for a (Q, r) policy">
+Return to the shop of the EOQ example, with demand averaging $100$ units a month (1200 a year) but now with a monthly standard deviation of $30$. The lead time is one month, so lead-time demand has $\mu_L = 100$ and $\sigma_L = 30$. For a $95\%$ cycle service level, $z = 1.645$, so
+$$
+\text{safety stock} = 1.645 \cdot 30 = 49.3, \qquad r = 100 + 49.3 = 149.3 .
+$$
+The policy is: when the inventory position falls to about $149$ units, order $Q = 200$. The expected shortage per cycle is $30\, \mathcal{L}(1.645) = 0.63$ units, so the fraction of demand met from stock is $1 - 0.63/200 \approx 99.7\%$. Holding the safety stock costs $6 \cdot 49.3 = 296$ a year. Raising the cycle service level to $99\%$ ($z = 2.326$) needs $69.8$ units of safety stock, at $419$ a year.
+</Example>
+
+The example shows the steep cost of high service levels: the last few percentage points require disproportionately more stock, because $z_\alpha$ grows rapidly as $\alpha$ approaches $1$.
+
+## Extensions
+
+- **Multi-echelon inventory.** Stock is held at several levels — a central warehouse feeding regional depots feeding stores — and the question is where safety stock is most effective. Holding it centrally pools demand variability across locations.
+- **Multiple items.** Items share a budget, warehouse space or a joint ordering cost; Lagrangian methods adjust each item's EOQ or service level.
+- **Perishability and obsolescence.** Food, blood and medicines expire; fashion and electronics lose value quickly. These push towards newsvendor-type models.
+- **Dynamic programming.** Time-varying demand, capacity limits and non-stationary costs are handled by stochastic dynamic programming, which is also how the optimality of base-stock and (s, S) policies is proved.
+- **Demand learning.** In practice the demand distribution is itself estimated from data, often censored by stockouts — sales are observed, but lost demand is not.
+
+Further reading: Silver, Pyke and Thomas, *Inventory and Production Management in Supply Chains*; Zipkin, *Foundations of Inventory Management*; Nahmias, *Production and Operations Analysis*.

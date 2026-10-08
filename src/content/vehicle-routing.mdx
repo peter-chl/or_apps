@@ -1,0 +1,159 @@
+Every morning a depot dispatches a fleet of vans to deliver to a list of customers. Each van has a limited capacity, each customer has an order of known size, and travelling between any two locations takes a known distance or time. Which customers should each van visit, and in what order, so that every order is delivered and the total distance driven is as small as possible?
+
+This is the **vehicle routing problem** (VRP). It combines two hard problems — partitioning customers among vehicles, and sequencing the stops of each vehicle — and it is one of the most heavily studied problems in combinatorial optimisation. It is also one of the most commercially important: routing software plans the daily work of parcel carriers, grocery deliveries, waste collection and field-service engineers. We start with its one-vehicle core, the travelling salesman problem.
+
+## The decision
+
+We have a depot, node $0$, and customers $1, \dots, n$. Let $V = \{0, 1, \dots, n\}$.
+
+- Travelling from node $i$ to node $j$ costs $c_{ij}$ (distance, time or money). We assume costs are **symmetric**, $c_{ij} = c_{ji}$, and satisfy the triangle inequality, as road distances roughly do.
+- Customer $i$ has demand $q_i$.
+- A fleet of identical vehicles, each with capacity $Q$, is based at the depot.
+
+A **route** is a cycle that starts at the depot, visits some customers and returns. The decision is a set of routes that together visit every customer exactly once, with the total demand on each route at most $Q$.
+
+## The travelling salesman problem
+
+With a single vehicle of unlimited capacity, the problem is to find the shortest cycle through all nodes: the **travelling salesman problem** (TSP). Let $x_{ij} \in \{0, 1\}$ equal $1$ if the tour travels directly from $i$ to $j$ (for $i \ne j$).
+
+<Definition name="TSP, Dantzig–Fulkerson–Johnson formulation">
+
+$$
+\begin{aligned}
+\min_{x} \quad & \sum_{i \in V} \sum_{j \ne i} c_{ij}\, x_{ij} \\
+\text{s.t.} \quad & \sum_{j \ne i} x_{ij} = 1, && i \in V \quad \text{(leave each node once)} \\
+& \sum_{i \ne j} x_{ij} = 1, && j \in V \quad \text{(enter each node once)} \\
+& \sum_{i \in S} \sum_{j \in S,\, j \ne i} x_{ij} \le |S| - 1, && S \subset V,\; 2 \le |S| \le |V| - 1 \quad \text{(subtour elimination)} \\
+& x_{ij} \in \{0, 1\} .
+\end{aligned}
+$$
+
+</Definition>
+
+The first two families are the **degree constraints**: every node is left exactly once and entered exactly once. On their own they define an assignment problem, whose solutions may consist of several disjoint cycles ("subtours") rather than one tour. The **subtour elimination constraints** rule these out: within any proper subset $S$ of nodes, the tour uses at most $|S| - 1$ arcs, so it cannot close a cycle inside $S$ and must leave $S$ at some point.
+
+There are exponentially many subtour constraints, so they are never written out in full. Instead they are added **lazily**: solve the model without them, find a subtour in the solution, add the constraint for its node set, and repeat. Branch-and-cut codes built on this idea, with many further classes of cutting planes, solve TSP instances with many thousands of cities to proven optimality.
+
+### The Miller–Tucker–Zemlin formulation
+
+A compact alternative introduces a continuous variable $u_i$ for each customer, read as the position of $i$ in the tour, and replaces the subtour constraints by
+$$
+u_i - u_j + n\, x_{ij} \le n - 1, \qquad i, j \in \{1, \dots, n\},\; i \ne j, \qquad 1 \le u_i \le n .
+$$
+If $x_{ij} = 1$ this forces $u_j \ge u_i + 1$, so positions strictly increase along the tour. A subtour that avoids the depot would need its positions to increase all the way round a cycle, which is impossible. If $x_{ij} = 0$ the constraint is slack. The **MTZ formulation** has only $O(n^2)$ constraints and is easy to type into a solver, but its LP relaxation is much weaker than DFJ's — the same weak-versus-strong phenomenon met in facility location — so it is practical only for small instances.
+
+## The capacitated VRP
+
+In the **capacitated vehicle routing problem** (CVRP) the fleet has $K$ vehicles of capacity $Q$. With symmetric costs it is convenient to use undirected edge variables, but the directed version extends the TSP directly: every customer is entered and left exactly once, while the depot is entered and left $K$ times,
+$$
+\sum_{j \ne 0} x_{0j} = K, \qquad \sum_{i \ne 0} x_{i0} = K .
+$$
+Subtour elimination is strengthened into the **capacity cuts**
+$$
+\sum_{i \notin S} \sum_{j \in S} x_{ij} \ge \left\lceil \frac{\sum_{i \in S} q_i}{Q} \right\rceil, \qquad S \subseteq \{1, \dots, n\},\; S \ne \emptyset .
+$$
+The right-hand side is a lower bound on the number of vehicles needed to serve the customers in $S$, and each must enter $S$ at least once. These constraints both prevent subtours and enforce capacity. (An MTZ-style alternative uses load variables in place of positions.)
+
+Exact CVRP algorithms — branch and cut, and branch-and-price on a set-partitioning formulation in which each column is a feasible route — are far more demanding than for the TSP: instances with a few hundred customers can already be hard. In practice, most routing is done with heuristics.
+
+## Solution methods
+
+### The Clarke–Wright savings heuristic
+
+The savings algorithm of Clarke and Wright (1964) is the classical construction heuristic for the CVRP, and it is still a common starting point.
+
+Begin with the wasteful solution in which every customer has its own route $0 \to i \to 0$. Merging the routes of customers $i$ and $j$ into one route $0 \to \dots \to i \to j \to \dots \to 0$ removes the edges $(i, 0)$ and $(0, j)$ and adds $(i, j)$. The **saving** is
+$$
+s_{ij} = c_{0i} + c_{0j} - c_{ij},
+$$
+which is non-negative under the triangle inequality.
+
+<Definition name="Savings algorithm (parallel version)">
+
+1. Start with one route $0 \to i \to 0$ for each customer.
+2. Compute $s_{ij}$ for all pairs of customers and sort them in decreasing order.
+3. For each pair $(i, j)$ in that order: if $i$ and $j$ are on different routes, both are endpoints of their routes (adjacent to the depot), and the combined demand is at most $Q$, merge the two routes by joining $i$ to $j$.
+4. Stop when the list is exhausted.
+
+</Definition>
+
+The rule "both must be endpoints" ensures that a merge simply joins two paths end to end; an interior customer already has both of its neighbours fixed.
+
+### Local search and 2-opt
+
+Constructed routes are usually improved by **local search**: repeatedly apply small changes that reduce cost until none is available. The basic move for a single route is **2-opt**: delete two non-adjacent edges $(a, b)$ and $(c, d)$ of the tour and reconnect it as $(a, c)$ and $(b, d)$, which reverses the segment from $b$ to $c$. The move improves the tour when
+$$
+c_{ac} + c_{bd} \lt c_{ab} + c_{cd} .
+$$
+With Euclidean distances, any tour with two crossing edges can be improved this way, so a 2-opt-optimal tour has no crossings. For multi-vehicle problems, further moves relocate a customer to another route, swap customers between routes, or exchange route tails.
+
+Local search stops at a local optimum. **Metaheuristics** — simulated annealing, tabu search, large neighbourhood search (destroy part of the solution and repair it), and genetic algorithms — escape local optima in a controlled way, and the best of them find solutions within a fraction of a per cent of optimal on standard benchmark instances.
+
+## Worked example
+
+<Example name="Savings on six customers">
+A depot $0$ serves six customers. Distances (city-block distances on a street grid) and demands are:
+
+|  | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **0** | · | 9 | 10 | 8 | 9 | 7 | 8 |
+| **1** | 9 | · | 5 | 11 | 14 | 16 | 11 |
+| **2** | 10 | 5 | · | 6 | 11 | 17 | 12 |
+| **3** | 8 | 11 | 6 | · | 9 | 15 | 14 |
+| **4** | 9 | 14 | 11 | 9 | · | 8 | 17 |
+| **5** | 7 | 16 | 17 | 15 | 8 | · | 9 |
+| **6** | 8 | 11 | 12 | 14 | 17 | 9 | · |
+| **Demand** | | 4 | 3 | 5 | 4 | 3 | 4 |
+
+Vehicle capacity is $Q = 12$. Total demand is $23$, so at least two vehicles are needed.
+
+**Savings.** For example $s_{12} = c_{01} + c_{02} - c_{12} = 9 + 10 - 5 = 14$. The full table is
+
+|  | 2 | 3 | 4 | 5 | 6 |
+| --- | --- | --- | --- | --- | --- |
+| **1** | 14 | 6 | 4 | 0 | 6 |
+| **2** | | 12 | 8 | 0 | 6 |
+| **3** | | | 8 | 0 | 2 |
+| **4** | | | | 8 | 0 |
+| **5** | | | | | 6 |
+
+**Merging.** Process the pairs in decreasing order of saving (ties broken by the smaller index first):
+
+| Pair | Saving | Action | Routes afterwards (load) |
+| --- | --- | --- | --- |
+| $(1,2)$ | 14 | merge | $0\text{–}1\text{–}2\text{–}0$ (7) |
+| $(2,3)$ | 12 | merge | $0\text{–}1\text{–}2\text{–}3\text{–}0$ (12) |
+| $(2,4)$ | 8 | reject: load $16 \gt 12$ | |
+| $(3,4)$ | 8 | reject: load $16 \gt 12$ | |
+| $(4,5)$ | 8 | merge | $0\text{–}4\text{–}5\text{–}0$ (7) |
+| $(1,3)$ | 6 | reject: same route | |
+| $(1,6)$ | 6 | reject: load $16 \gt 12$ | |
+| $(2,6)$ | 6 | reject: load $16 \gt 12$ | |
+| $(5,6)$ | 6 | merge | $0\text{–}4\text{–}5\text{–}6\text{–}0$ (11) |
+
+Any further merge would have to join the two routes, whose combined load is $23$, so no more merges are possible. The result is
+
+- Route 1: $0 \to 1 \to 2 \to 3 \to 0$, load $12$, length $9 + 5 + 6 + 8 = 28$;
+- Route 2: $0 \to 4 \to 5 \to 6 \to 0$, load $11$, length $9 + 8 + 9 + 8 = 34$.
+
+Total length is $62$. The six out-and-back routes would have cost $2(9 + 10 + 8 + 9 + 7 + 8) = 102$, and indeed $102 - 62 = 40 = 14 + 12 + 8 + 6$, the sum of the savings used. Enumerating all feasible partitions of the customers into routes confirms that $62$ is optimal for this instance — savings is not always this lucky.
+
+**A 2-opt move.** If capacity were unlimited, a single vehicle could visit everyone. Suppose a first tour is $0 \to 2 \to 1 \to 3 \to 4 \to 5 \to 6 \to 0$, of length $60$. Deleting edges $(0, 2)$ and $(1, 3)$ and reconnecting as $(0, 1)$ and $(2, 3)$ changes the length by $c_{01} + c_{23} - c_{02} - c_{13} = 9 + 6 - 10 - 11 = -6$, giving $0 \to 1 \to 2 \to 3 \to 4 \to 5 \to 6 \to 0$ of length $54$. No further 2-opt move improves this tour, and it is in fact the optimal TSP tour. The capacity limit therefore costs $62 - 54 = 8$ units of distance.
+</Example>
+
+<Remark>
+The ordering of the savings list matters. Ties are common with integer distances, and different tie-breaking rules can lead to different routes. Practical implementations often run savings several times with perturbed or weighted savings, $s_{ij} = c_{0i} + c_{0j} - \lambda\, c_{ij}$, and keep the best result.
+</Remark>
+
+## Extensions
+
+The CVRP is the core of a large family of models. Real deployments typically add some of the following:
+
+- **Time windows (VRPTW).** Customer $i$ must be served within an interval $[a_i, b_i]$, and service takes time. A vehicle arriving early waits; arriving late is infeasible (or penalised). Time windows make even finding a feasible solution non-trivial and dominate many practical applications, from grocery delivery slots to scheduled maintenance visits.
+- **Heterogeneous fleets** with different capacities and costs, and limits on route duration or driver working hours.
+- **Pickup and delivery.** Goods or passengers are collected at one location and delivered to another on the same route, with precedence and capacity constraints along the way — the basis of dial-a-ride and ride-sharing.
+- **Multiple depots and multiple trips**, in which a vehicle may return to reload during the day.
+- **Dynamic and stochastic routing.** New orders arrive during the day, and travel times vary with traffic, so routes are re-optimised on the fly.
+- **Location-routing.** Depot locations and routes are chosen together, combining this lecture with facility location.
+
+Further reading: Toth and Vigo (eds.), *Vehicle Routing: Problems, Methods, and Applications*; Applegate, Bixby, Chvátal and Cook, *The Traveling Salesman Problem: A Computational Study*.

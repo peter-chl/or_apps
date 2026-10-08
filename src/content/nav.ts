@@ -33,6 +33,24 @@ export const parts: Part[] = [
         summary:
           "Shipping goods from supply points to demand points at minimum cost, and what the dual prices tell you.",
       },
+      {
+        slug: "facility-location",
+        title: "Facility Location",
+        summary:
+          "Choosing which sites to open and which customers each serves, and why two equivalent MIP formulations can differ greatly in strength.",
+      },
+      {
+        slug: "vehicle-routing",
+        title: "Vehicle Routing",
+        summary:
+          "Designing delivery routes for a capacitated fleet: TSP formulations, the Clarke–Wright savings heuristic, and local search.",
+      },
+      {
+        slug: "inventory",
+        title: "Inventory Management",
+        summary:
+          "How much to order and when: the EOQ trade-off, the newsvendor critical ratio, and safety stock under uncertain demand.",
+      },
     ],
   },
 ];
