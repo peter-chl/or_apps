@@ -1,4 +1,4 @@
-A hospital, a contact center, a police force or an airport has to have the right number of people at work at every hour of every day. Too few and service collapses; too many and the wage bill — usually the largest controllable cost in a service organization — balloons. Yet staff cannot be switched on and off by the hour: they work shifts of fixed length, need days off, and are governed by labor law and union agreements. How many people should be employed, and on which shifts?
+A hospital, a contact centre, a police force or an airport has to have the right number of people at work at every hour of every day. Too few and service collapses; too many and the wage bill — usually the largest controllable cost in a service organization — balloons. Yet staff cannot be switched on and off by the hour: they work shifts of fixed length, need days off, and are governed by labour law and union agreements. How many people should be employed, and on which shifts?
 
 This is **staff scheduling** (or workforce scheduling). Its core is one of the cleanest integer programs in OR: a **set covering** model in which each possible shift pattern is a column and each period's staffing requirement is a row. George Dantzig used exactly this formulation in 1954 for staffing toll booths, and it remains the backbone of commercial rostering software.
 
@@ -6,7 +6,7 @@ This is **staff scheduling** (or workforce scheduling). Its core is one of the c
 
 Split the planning horizon (a day, a week) into periods indexed by $t = 1, \dots, T$ — hours, half-hours, or whole days.
 
-- In period $t$ at least $r_t$ staff must be on duty. These **staffing requirements** are taken as given here; they come from demand forecasts and, for queueing systems such as call centers, from a queueing model.
+- In period $t$ at least $r_t$ staff must be on duty. These **staffing requirements** are taken as given here; they come from demand forecasts and, for queueing systems such as call centres, from a queueing model.
 - A **shift** (or shift pattern) $j = 1, \dots, n$ is a feasible working schedule: for example "08:00–16:00 with a break at 12:00", or "work Monday to Friday, off Saturday and Sunday". The set of shifts encodes all the rules about what a legal working pattern looks like.
 - Assigning one person to shift $j$ costs $c_j$ — wages plus any premiums for nights or weekends.
 
@@ -30,7 +30,7 @@ The objective is the total cost of the assigned shifts. Each cover constraint sa
 An integer program $\min \{ c^\top x : Ax \ge r, \; x \in \mathbb{Z}^n_{\ge 0} \}$ with a 0–1 matrix $A$ is a **(generalized) set covering problem**. Each column is a subset of the rows (the periods a shift covers), and we choose subsets, with repetition, so that row $t$ is covered at least $r_t$ times at minimum cost.
 </Definition>
 
-The modeling power lives in the columns. Breaks, maximum shift lengths, split shifts and start-time restrictions are all handled by deciding which patterns are allowed to exist, not by adding constraints. The price is that the number of columns can be enormous: with 15-minute periods, several shift lengths, start times and break windows, a single day can easily generate thousands of patterns.
+The modelling power lives in the columns. Breaks, maximum shift lengths, split shifts and start-time restrictions are all handled by deciding which patterns are allowed to exist, not by adding constraints. The price is that the number of columns can be enormous: with 15-minute periods, several shift lengths, start times and break windows, a single day can easily generate thousands of patterns.
 
 ## Cyclic days-off scheduling
 
@@ -113,7 +113,7 @@ What the LP does not provide is a usable schedule: $\tfrac13$ of a person cannot
 Real workforce planning is rarely a single model. It is usually a **pipeline**, with each stage feeding the next:
 
 1. **Forecasting.** Predict demand (calls, patients, passengers) per period, typically 15 or 30 minutes, weeks ahead.
-2. **Staffing requirements.** Convert forecast demand into the number of staff $r_t$ needed in each period to meet a service target. For call centers this is a queueing calculation (see the call-center lecture); for wards it may be a nurse-to-patient ratio.
+2. **Staffing requirements.** Convert forecast demand into the number of staff $r_t$ needed in each period to meet a service target. For call centres this is a queueing calculation (see the call-centre lecture); for wards it may be a nurse-to-patient ratio.
 3. **Shift scheduling.** Choose how many people work each shift pattern to cover the $r_t$ at minimum cost — the set covering model above.
 4. **Rostering.** Assign named individuals to the shifts, respecting each person's contract, skills, leave and preferences.
 
@@ -121,8 +121,8 @@ Splitting the problem this way keeps each stage tractable, at the cost of some o
 
 **Nurse rostering.** The best-studied rostering problem. Variables are typically binary, $y_{ist} = 1$ if nurse $i$ works shift $s$ on day $t$. Hard constraints include at most one shift per day, minimum rest between shifts (no early shift straight after a night), a maximum number of consecutive working days, contracted hours over the roster period, and skill mix (each shift needs at least one senior nurse).
 
-**Preferences and soft constraints.** Many rules are desirable rather than mandatory: requested days off, avoiding isolated working days, fair distribution of weekends and nights. These are modeled as **soft constraints**: introduce a slack variable $s_k \ge 0$ for the violation of rule $k$, and add a penalty $w_k s_k$ to the objective. The weights $w_k$ express the organization's priorities and are, in practice, tuned with the people who will live with the roster. Understaffing itself can be made soft — with a high penalty — so that the model always returns a schedule and reports where it falls short.
+**Preferences and soft constraints.** Many rules are desirable rather than mandatory: requested days off, avoiding isolated working days, fair distribution of weekends and nights. These are modelled as **soft constraints**: introduce a slack variable $s_k \ge 0$ for the violation of rule $k$, and add a penalty $w_k s_k$ to the objective. The weights $w_k$ express the organization's priorities and are, in practice, tuned with the people who will live with the roster. Understaffing itself can be made soft — with a high penalty — so that the model always returns a schedule and reports where it falls short.
 
-**Fairness and self-rostering.** Because rosters shape people's lives, acceptance matters as much as cost. Common approaches let staff bid for shifts and then use optimization to repair the result, or add equity constraints bounding the difference between the most and least favored employees.
+**Fairness and self-rostering.** Because rosters shape people's lives, acceptance matters as much as cost. Common approaches let staff bid for shifts and then use optimization to repair the result, or add equity constraints bounding the difference between the most and least favoured employees.
 
 Further reading: Ernst, Jiang, Krishnamoorthy and Sier, "Staff scheduling and rostering: a review of applications, methods and models", *European Journal of Operational Research* (2004); Pinedo, *Planning and Scheduling in Manufacturing and Services*, for shift scheduling and the days-off problem.

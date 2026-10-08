@@ -1,6 +1,6 @@
-A customer-service center receives telephone calls at random times. Each call needs an agent for a few minutes; if all agents are busy, the caller waits in a queue, listening to music. Agents are expensive, but so are long waits — customers hang up, complain, or take their business elsewhere. How many agents should be on duty in each half-hour?
+A customer-service centre receives telephone calls at random times. Each call needs an agent for a few minutes; if all agents are busy, the caller waits in a queue, listening to music. Agents are expensive, but so are long waits — customers hang up, complain, or take their business elsewhere. How many agents should be on duty in each half-hour?
 
-This is the **staffing problem** for call centers (and, with different vocabulary, for emergency dispatch, help desks, hospital admissions and checkout lanes). Its classical answer is a hundred-year-old queueing formula due to A. K. Erlang, a Danish mathematician at the Copenhagen Telephone Company, who developed it to size telephone exchanges. The formula, together with a remarkably accurate rule of thumb derived from it, is still at the heart of every workforce management system sold to contact centers.
+This is the **staffing problem** for call centres (and, with different vocabulary, for emergency dispatch, help desks, hospital admissions and checkout lanes). Its classical answer is a hundred-year-old queueing formula due to A. K. Erlang, a Danish mathematician at the Copenhagen Telephone Company, who developed it to size telephone exchanges. The formula, together with a remarkably accurate rule of thumb derived from it, is still at the heart of every workforce management system sold to contact centres.
 
 ## The decision
 
@@ -22,7 +22,7 @@ A stable queue needs $c > a$: if agents could, on average, handle no more work t
 
 The standard model is the **M/M/c queue**: arrivals form a Poisson process with rate $\lambda$ (the first M), handle times are independent and exponentially distributed with mean $h$ (the second M), there are $c$ identical agents, callers wait in a single first-come first-served queue, and nobody hangs up.
 
-Under these assumptions the long-run behavior has closed forms. Let $W$ be the waiting time (before reaching an agent) of an arriving call.
+Under these assumptions the long-run behaviour has closed forms. Let $W$ be the waiting time (before reaching an agent) of an arriving call.
 
 <Result name="Erlang C formula">
 If $a \lt c$, the probability that an arriving call has to wait is
@@ -71,14 +71,14 @@ $$
 where $\Phi$ and $\varphi$ are the standard normal distribution function and density.
 </Result>
 
-This **quality-and-efficiency-driven** (QED) regime explains the economics of large call centers. Holding $\beta$ fixed keeps the probability of waiting roughly constant, while utilization $a / (a + \beta\sqrt{a}) \to 1$. Large centers can therefore run their agents much harder than small ones *at the same service quality*: the safety staffing $\beta\sqrt{a}$ grows only like the square root of the volume. This is the economies-of-scale argument for pooling small centers into large ones.
+This **quality-and-efficiency-driven** (QED) regime explains the economics of large call centres. Holding $\beta$ fixed keeps the probability of waiting roughly constant, while utilization $a / (a + \beta\sqrt{a}) \to 1$. Large centres can therefore run their agents much harder than small ones *at the same service quality*: the safety staffing $\beta\sqrt{a}$ grows only like the square root of the volume. This is the economies-of-scale argument for pooling small centres into large ones.
 
 The practical recipe is: pick $\beta$ from the limit formula to hit a target probability of waiting, set $c = \lceil a + \beta\sqrt{a} \rceil$, and if needed adjust by one using the exact formula.
 
 ## Worked example
 
 <Example name="Sizing one half-hour">
-A center expects 400 calls per hour with an average handle time of 3 minutes, and wants to answer 80% of calls within 20 seconds. The offered load is
+A centre expects 400 calls per hour with an average handle time of 3 minutes, and wants to answer 80% of calls within 20 seconds. The offered load is
 $$
 a = \lambda h = \frac{400}{60} \times 3 = 20 \text{ Erlangs},
 $$
@@ -118,7 +118,7 @@ The M/M/c model is a starting point. Each of its assumptions fails in practice, 
 
 **Abandonment.** Real callers hang up. In the **Erlang A** model (M/M/c+M) each waiting caller abandons after an exponentially distributed patience time with mean $\theta^{-1}$. Abandonment acts as a safety valve: the queue is stable even when $c \le a$, because impatient callers remove themselves. Erlang C, which assumes infinite patience, therefore tends to *overstate* waits and to recommend more agents than needed when abandonment is significant. The abandonment rate becomes a performance measure in its own right, and service targets are often set on it directly.
 
-**Non-exponential handle times.** Handle times are typically closer to lognormal than exponential. The Erlang formulas are fairly robust, but for precise work centers use approximations for the M/G/c queue or simulation.
+**Non-exponential handle times.** Handle times are typically closer to lognormal than exponential. The Erlang formulas are fairly robust, but for precise work centres use approximations for the M/G/c queue or simulation.
 
 **Time-varying arrivals.** Call volumes follow strong daily and weekly patterns, so $\lambda$ is really $\lambda(t)$. The common approach is **stationary independent period-by-period** (SIPP) staffing: treat each half-hour as a separate stationary M/M/c queue using its own forecast rate, and compute a requirement $r_t$ for each period. This works well when periods are long relative to handle times and the rate changes slowly; when the load ramps up sharply, the queue lags behind the arrival rate and SIPP understaffs. Refinements shift the load forward by one handle time, or use the *offered load* of an infinite-server queue in place of $\lambda(t) h$.
 
@@ -126,6 +126,6 @@ The M/M/c model is a starting point. Each of its assumptions fails in practice, 
 
 **Linking to shift scheduling.** The output of this lecture — a requirement $r_t$ per half-hour — is precisely the input to the set covering model for shift scheduling. Because shifts are long and requirements vary, the resulting schedule over-covers many periods. Better plans come from **integrating** the two steps: let the shift model choose staffing levels directly, with a penalty for the service level achieved in each period (a concave, increasing function of agents, which can be approximated piecewise linearly), rather than imposing fixed requirements.
 
-**Skills-based routing.** Large centers serve several call types (languages, products) with agents who have different skill sets. Deciding who answers which call, and how many agents of each skill combination to hire, leads to queueing networks that are usually tackled with simulation-based optimization.
+**Skills-based routing.** Large centres serve several call types (languages, products) with agents who have different skill sets. Deciding who answers which call, and how many agents of each skill combination to hire, leads to queueing networks that are usually tackled with simulation-based optimization.
 
-Further reading: Gans, Koole and Mandelbaum, "Telephone call centers: tutorial, review, and research prospects", *Manufacturing & Service Operations Management* (2003); Koole, *Call Center Optimization*.
+Further reading: Gans, Koole and Mandelbaum, "Telephone call centres: tutorial, review, and research prospects", *Manufacturing & Service Operations Management* (2003); Koole, *Call Centre Optimization*.

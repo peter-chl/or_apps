@@ -20,7 +20,7 @@ export const parts: Part[] = [
         slug: "introduction",
         title: "What Is Operations Research?",
         summary:
-          "The modeling cycle, the core toolkit, and how the rest of these notes are organized.",
+          "The modelling cycle, the core toolkit, and how the rest of these notes are organized.",
       },
     ],
   },
@@ -64,9 +64,9 @@ export const parts: Part[] = [
       },
       {
         slug: "call-centers",
-        title: "Call Center Staffing",
+        title: "Call Centre Staffing",
         summary:
-          "Sizing a call center with the Erlang C queue, service-level targets, and the square-root staffing rule.",
+          "Sizing a call centre with the Erlang C queue, service-level targets, and the square-root staffing rule.",
       },
     ],
   },

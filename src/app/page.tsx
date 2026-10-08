@@ -13,7 +13,7 @@ export default function Contents() {
         </h1>
         <p className="mt-5 font-serif text-lg leading-relaxed text-muted">
           Each lecture takes one real decision problem — routing a fleet,
-          staffing a call center, pricing airline seats, committing power
+          staffing a call centre, pricing airline seats, committing power
           plants — and works through it the same way: what the decision is,
           how to write it as a mathematical model, how that model is solved,
           and what the answer tells you.

@@ -18,7 +18,8 @@ different design: lecture-note layout with a left navigation panel).
 
 ## Content rules
 
-- American English throughout: optimize, modeling, center, labor, traveling.
+- Canadian English throughout: -ize (optimize, minimize) but -our, -re and
+  doubled l (labour, centre, modelling, travelling). Keep slugs as they are.
 - Every number in a worked example must be verified by computing it (e.g.
   Python with scipy), not by hand. Leave out claims you can't confirm.
 - In MDX prose, a bare `<` or `{` is parsed as JSX — use math mode or words.
