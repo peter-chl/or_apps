@@ -111,7 +111,7 @@ export const parts: Part[] = [
         slug: "ai-serving",
         title: "Serving AI Models",
         summary:
-          "Placing Mixture-of-Experts models on GPUs as expert load shifts: a convex relaxation, rounding guarantees, and online competitive analysis.",
+          "Placing models on GPUs: Mixture-of-Experts placement as load shifts over time, and block placement and request routing across servers spread over the Internet.",
       },
     ],
   },

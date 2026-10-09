@@ -1,6 +1,9 @@
 Large AI models are expensive to run, and they are run a lot. Once a model has been trained, every user request has to be served on a fleet of GPUs that is costly to buy, scarce, and shared by many requests at once. How many GPUs to provision, which requests to batch together, and where to place the pieces of a model across the hardware are all resource-allocation decisions under uncertainty — exactly the kind of problem operations research was built for.
 
-This lecture surveys the decisions involved and then works through one of them in depth: placing the experts of a **Mixture-of-Experts** (MoE) model on GPUs as their popularity shifts over time. The model and results in the second half follow the recent paper of Huang, Lou and Xiao, *Mixture-of-Experts Serving* (arXiv:2607.17880, 2026), which brings competitive analysis and approximation algorithms to the problem.
+This lecture surveys the decisions involved and then works through two placement problems in depth, taken from recent papers:
+
+- **Over time, inside a data centre:** placing the experts of a **Mixture-of-Experts** (MoE) model on GPUs as their popularity shifts, following Huang, Lou and Xiao, *Mixture-of-Experts Serving* (arXiv:2607.17880, 2026), which brings competitive analysis and approximation algorithms to the problem.
+- **Across space, over the Internet:** splitting a model's layers across servers scattered around a network and routing each request through a chain of them, following Sun, He, Ji and Parag, *Optimizing Resource Allocation for Geographically-Distributed Inference by Large Language Models* (arXiv:2512.21884, 2025), which formulates it as a mixed-integer program and gives a greedy algorithm with a performance guarantee.
 
 ## The decisions in AI serving
 
@@ -8,7 +11,7 @@ Serving a language model involves several layers of decisions, each recognizable
 
 - **Capacity.** How many GPUs to keep running for a given request rate and latency target. This is a staffing problem: GPUs play the role of agents, requests the role of calls, and the trade-off between utilization and waiting time is the one quantified by the Erlang C model in the call centre lecture.
 - **Scheduling and batching.** A GPU is most efficient when it processes many requests together, so requests are grouped into batches and advanced one generated token at a time. Two features make this harder than classical scheduling: a request's output length is not known when it arrives, and the memory it needs (its *key–value cache*) grows as it generates. Classical scheduling theory studied batching and unknown job lengths separately; recent theoretical work studies them together with growing memory use.
-- **Placement.** Which parts of the model live on which GPUs. For Mixture-of-Experts models, an architecture used by several prominent recent language models, this is the problem studied in the rest of this lecture.
+- **Placement.** Which parts of the model live on which GPUs. For Mixture-of-Experts models, an architecture used by several prominent recent language models, the question is how many GPUs each expert gets. When no single machine can hold the model, the question becomes which servers hold which layers, and how requests are routed through them. These are the two problems studied in the rest of this lecture.
 
 <Remark>
 The common thread is that AI serving decisions are made *online*: requests arrive continuously, demand shifts by time of day and application, and the system must commit before it sees the future. That is why competitive analysis — comparing an online policy with the best policy in hindsight — is the natural yardstick here, rather than the expected-cost criterion used in the inventory lecture.
@@ -25,7 +28,7 @@ Two costs pull in opposite directions:
 - **Latency.** The time to finish a step is set by the most heavily loaded expert relative to the GPUs serving it. Adding copies of a busy expert reduces it.
 - **Reconfiguration.** Moving a GPU from one expert to another means copying weights, warming caches and other overhead. Reallocating too often wastes this effort, especially if the load shifts back.
 
-## Formulation
+## The MoE serving model
 
 Consider $m$ experts served on $n > m$ GPUs over time steps $t = 1, \dots, T$. Every expert must always have at least one GPU, so the first $m$ GPUs are assigned one per expert and the decision concerns the remaining
 $$
@@ -66,7 +69,7 @@ $$
 $$
 (The factor of 2 is dropped, which changes constants only.) Its optimal value is a lower bound on the integer optimum, and its dual — built with Fenchel conjugates of the $f_t$ — drives the online analysis below, much as LP duality priced routes in the transportation problem.
 
-## The static problem
+## Static expert placement
 
 With a fixed configuration the problem is a resource allocation: split $k$ GPUs among $m$ experts to minimize total latency over a known workload history.
 
@@ -99,7 +102,7 @@ The convex relaxation has optimum approximately $x^\ast = (1.77, 1.15, 0.08)$ wi
 
 </Example>
 
-## The dynamic problem online
+## Dynamic expert placement online
 
 In practice the workload is not known in advance. An **online** algorithm sees $r_t$ and must choose $x_t$ before $r_{t+1}$ is revealed.
 
@@ -142,7 +145,7 @@ The fractional schedule is converted into whole GPUs by **lazy threshold roundin
 
 The lower bound has a natural interpretation. In the dual, demand keeps arriving for a single expert for an unknown number of steps, and the algorithm must decide how much dual "budget" to commit at each step, with diminishing returns. The offline benchmark knows when the burst ends and spreads the budget evenly; the online algorithm must overcommit early to stay competitive in case the burst is short. That forced overcommitment costs a $\sqrt{\log k}$ factor.
 
-## Worked example
+## Worked example: spikes versus shifts
 
 <Example name="Spikes versus shifts">
 
@@ -161,11 +164,117 @@ Here *myopic greedy* minimizes current latency plus the cost of moving from the 
 
 The example shows each failure mode. Chasing gets the lowest latency but spends 28 on moves, most of them reacting to the one-step spike and then undoing the reaction. Myopic greedy is too timid: a move only pays off over several steps, so judged one step at a time it rarely looks worthwhile. The hindsight optimum leans toward expert 1 early, then — knowing that a long shift is coming — moves to the even split at the spike and stays there, and moves fully to expert 2 only when the lasting shift begins. An online algorithm cannot know the spike from the shift when it happens; the competitive ratio measures how much that ignorance must cost in the worst case.
 
+## Distributed inference over a network
+
+The second placement problem arises when a model is too large for any single GPU available. A *pipeline-parallel* system splits the model's $L$ transformer **blocks** (groups of layers) across several servers; each server holds a run of consecutive blocks, and a request is processed by a **chain of servers** that together hold every block, in order. Sun, He, Ji and Parag study this for PETALS, a system that runs large models on low-end GPUs spread over the Internet. Their argument for the setting: the bottleneck in running such models is GPU memory rather than processing speed, and offloading parameters to slower storage is far slower than pooling memory across machines.
+
+In PETALS the client relays all traffic: it sends the current token's embedding to the first server, receives the result, forwards it to the next server, and so on. Each server keeps an **attention cache** for every request it is serving, so after the first token only a few kilobytes cross the network per server per token.
+
+Two decisions must be made:
+
+- **Block placement:** which consecutive blocks each server stores.
+- **Request routing:** which chain of servers each request uses.
+
+They interact through GPU memory. Storing more blocks on a server shortens chains but leaves less room for attention caches, which limits how many requests that server can carry.
+
+### The model
+
+Server $j$ stores blocks $a_j, \dots, a_j + m_j - 1$: its first block $a_j$ and the number of blocks $m_j$. The paper's performance models, validated by experiment, say:
+
+- **Time.** After the first token, each token costs $t_{cj} + \tau_j k_j$ at server $j$, where $t_{cj}$ is the round-trip time between client $c$ and server $j$, $\tau_j$ is the server's per-block processing time, and $k_j$ is the number of blocks it processes for this request. Measured inference time was close to linear in the number of blocks and largely independent of how many requests ran concurrently, as long as they fit in memory.
+- **Memory.** A server with memory $M_j$ that stores $m_j$ blocks and processes $k_j^r$ blocks for each request $r$ uses
+$$
+s_m m_j + s_c \sum_r k_j^r \le M_j ,
+$$
+where $s_m$ is the size of one block and $s_c$ the size of one block's attention cache for one request.
+
+A chain is **feasible** if each server's blocks pick up exactly where the previous server's left off. If request $r$ goes from server $i$ to server $j$, then server $j$ processes blocks $a_i + m_i$ through $a_j + m_j - 1$, which requires
+$$
+a_j \le a_i + m_i \le a_j + m_j - 1 .
+$$
+The client acts as a dummy server holding "block 0" at the start of the chain and "block $L + 1$" at the end.
+
+<Definition name="Block placement and request routing (BPRR)">
+Choose the placement $(a_j, m_j)$ of every server and a feasible chain for every request to minimize the total per-token inference time
+$$
+\sum_{r} \sum_{(i,j) \in \text{chain}(r)} \Big( t_{cj} + \tau_j \,(a_j + m_j - a_i - m_i) \Big),
+$$
+subject to the memory constraint at every server and $a_j + m_j - 1 \le L$.
+</Definition>
+
+Written directly, the problem has an exponential number of candidate chains, and which chains are feasible depends on the placement. The paper turns it into a **mixed-integer linear program** of polynomial size. Routing becomes a link variable $f^r_{ij} \in \{0, 1\}$ — does request $r$ go from $i$ to $j$? — with flow conservation from a source copy of each client to a sink copy, exactly as in a shortest-path or network-flow model. The feasibility condition becomes the constraints $a_j f^r_{ij} \le a_i + m_i$ and $(a_i + m_i) f^r_{ij} \le a_j + m_j - 1$. These are products of an integer and a binary variable, which are linearized with auxiliary variables in the standard way.
+
+<Result name="Hardness (Sun, He, Ji and Parag)">
+BPRR is NP-hard, by reduction from the partition problem. It remains NP-hard with a single client — the common case where all users reach the system through one proxy.
+</Result>
+
+The MILP has $O(|\mathcal{R}| \cdot |E|)$ variables and constraints, where $\mathcal{R}$ is the set of requests and $E$ the links between clients and servers. That grows quadratically in the number of servers, so solving it exactly does not scale. Rounding its LP relaxation does not help either: the fractional solution need not round to a feasible placement.
+
+## Solving block placement and routing
+
+### Conservative greedy
+
+The paper's algorithm, **CG-BPRR**, decomposes the problem into three subproblems solved in sequence, one per type of decision.
+
+1. **How many blocks per server.** Reserve memory as if *every* request might pass through *every* block on the server:
+$$
+m_j = \min\Big( \Big\lfloor \frac{M_j}{s_m + s_c |\mathcal{R}|} \Big\rfloor, \; L \Big).
+$$
+Whatever routing comes later, no server can run out of memory.
+2. **Which blocks.** Rank servers by their **amortized inference time** $\tilde t_j = \tau_j + t_{*j}/m_j$, where $t_{*j}$ is the largest round-trip time from any client to $j$. This is the worst-case time per block on server $j$ with its communication cost spread over the blocks it holds. Then place blocks greedily, fastest server first, each server taking the consecutive blocks that most need service. In effect, the fastest servers cover blocks $1, 2, \dots, L$ in turn.
+3. **Routing.** With the placement fixed, the paper shows that routing each client's requests along a **shortest path** through the feasible chains is optimal.
+
+<Result name="Guarantee for CG-BPRR (Sun, He, Ji and Parag)">
+
+Sort servers so that $\tilde t_1 \le \tilde t_2 \le \cdots$, and let $K$ be the number of servers needed before every block is placed. If CG-BPRR finds a feasible placement, its average per-token inference time is at most
+$$
+\sum_{j=1}^{K} \tilde t_j m_j - \tau_K \Big( \sum_{j=1}^{K} m_j - L \Big),
+$$
+the time for a request from the client farthest from every server, routed through servers $1, \dots, K$. The algorithm runs in polynomial time.
+
+</Result>
+
+The guarantee comes at a price. The memory reservation in step 1 is conservative, so CG-BPRR can fail to find a placement when one exists, and it can be far from optimal when replicating blocks and spreading requests across the copies would be better. The paper gives an example of each.
+
+### Online: two time scales
+
+Requests arrive continuously, but moving blocks between servers is slow, so the online version separates the decisions by time scale:
+
+- **Placement, rarely, by robust optimization.** Steps 1–2 already plan for the worst case: $|\mathcal{R}|$ concurrent requests, all from the farthest client. Run with a chosen design capacity $|\mathcal{R}|$, the same bound on average per-token time holds whenever the number of concurrent requests is at most $|\mathcal{R}|$.
+- **Routing, per request, by shortest path.** Each arriving request takes the path minimizing waiting time plus inference time, where a link's waiting time is how long until the server will have enough memory free.
+
+The design capacity $|\mathcal{R}|$ sets a **throughput–delay trade-off**. A larger value lets more requests run at once without waiting, but forces fewer blocks per server, longer chains and slower tokens. The paper suggests setting it to the mean plus one standard deviation of the number of requests arriving during one request's lifetime, capped by what the servers' memory allows. This is the same reasoning as a safety stock in the inventory lecture.
+
+In experiments with BLOOM-176B on a real PETALS deployment, and in simulations on Internet topologies, the authors report average inference times 60–80% lower than PETALS' own heuristics. Most of the gain came from the time to the first token.
+
+<Example name="Conservative placement versus the optimum">
+
+A model of $L = 4$ blocks is served to one client with $|\mathcal{R}| = 4$ concurrent requests. Memory is measured in block sizes ($s_m = 1$), and one block's attention cache for one request takes $s_c = 1/4$. There are three servers:
+
+| Server | Memory $M_j$ | Per-block time $\tau_j$ | Round trip $t_{cj}$ |
+| --- | --- | --- | --- |
+| A (fast GPU, far away) | 4 | 1 | 5 |
+| B | 3 | 2 | 1 |
+| C | 3 | 2 | 2 |
+
+**CG-BPRR.** Step 1 reserves memory for all four requests on every stored block, so each block costs $1 + 4 \cdot \tfrac14 = 2$ units: $m_A = 2$, $m_B = m_C = 1$. The amortized times are $\tilde t_B = 2 + 1/1 = 3$, $\tilde t_A = 1 + 5/2 = 3.5$ and $\tilde t_C = 2 + 2/1 = 4$. Placing fastest first, B takes block 1, A blocks 2–3 and C block 4. The only feasible chain is B → A → C, at
+$$
+(1 + 2 \cdot 1) + (5 + 1 \cdot 2) + (2 + 2 \cdot 1) = 14
+$$
+per token. This equals the guarantee $3 \cdot 1 + 3.5 \cdot 2 + 4 \cdot 1 = 14$: with a single client, every request is the worst-case request.
+
+**Optimum.** An exhaustive search over all placements and routings finds an average of $12.5$. A stores blocks 1–2, and both B and C store blocks 3–4. Two requests take A → B (cost $7 + 5 = 12$) and two take A → C (cost $7 + 6 = 13$). Memory is exactly full on all three servers: A uses $2 + 4 \cdot 2 \cdot \tfrac14 = 4$, and B and C each use $2 + 2 \cdot 2 \cdot \tfrac14 = 3$.
+
+</Example>
+
+The optimum beats CG-BPRR by about 11% because it **replicates** blocks 3–4 and splits the load between the copies. Each copy then needs attention caches for only two requests, leaving room to store two blocks instead of one. CG-BPRR's reservation assumes every request could land on every server, which rules this out — the price it pays for a guarantee that holds under any routing and, online, under any arrival pattern within the design capacity.
+
 ## Extensions and open questions
 
 - **Closing the gap.** The $\sqrt{\log k}$ barrier is proved for the dual problem used in the analysis. Whether a different technique can beat it for MoE serving itself is open.
 - **Richer models.** Real deployments add communication costs between GPUs, experts of different sizes, memory limits, and the batching and key–value cache constraints from the first section. Each breaks some structure the analysis relies on.
 - **Predictions.** Expert load is partly predictable from recent history. Online algorithms that use predictions while remaining robust when they are wrong — *learning-augmented* algorithms — are a natural next step.
-- **Connections.** The ingredients are the same as in earlier lectures: a convex relaxation and its dual (transportation, unit commitment), rounding with a provable guarantee (facility location), and a hedge between reacting and waiting (inventory, revenue management).
+- **Beyond pipelines.** The distributed-inference model assumes pipeline parallelism and the client relaying all traffic; the authors note their formulation adapts to servers that forward directly to each other. Splitting individual layers across machines (tensor parallelism) is a harder extension, and other objectives — the cost of renting GPUs, robustness to servers failing — are left open.
+- **Connections.** The ingredients are the same as in earlier lectures: a convex relaxation and its dual (transportation, unit commitment), rounding with a provable guarantee (facility location), a hedge between reacting and waiting (inventory, revenue management), and placement with flow-based routing (facility location, vehicle routing).
 
-Source: Z. Huang, Q. Lou and T. Xiao, *Mixture-of-Experts Serving*, arXiv:2607.17880 (2026). For background on competitive analysis, see Borodin and El-Yaniv, *Online Computation and Competitive Analysis*.
+Sources: Z. Huang, Q. Lou and T. Xiao, *Mixture-of-Experts Serving*, arXiv:2607.17880 (2026); T. Sun, T. He, B. Ji and P. Parag, *Optimizing Resource Allocation for Geographically-Distributed Inference by Large Language Models*, arXiv:2512.21884 (2025). For background on competitive analysis, see Borodin and El-Yaniv, *Online Computation and Competitive Analysis*.
