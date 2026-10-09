@@ -97,6 +97,12 @@ export const parts: Part[] = [
           "Scheduling which power stations run each hour and how much they produce, and how the dual of the demand constraint sets the electricity price.",
       },
       {
+        slug: "electric-buses",
+        title: "Electric Bus Scheduling",
+        summary:
+          "Covering a timetable with battery-limited buses and planning when to charge them: vehicle scheduling with range constraints, and charging under time-varying prices and grid limits.",
+      },
+      {
         slug: "crew-scheduling",
         title: "Airline Crew Scheduling",
         summary:

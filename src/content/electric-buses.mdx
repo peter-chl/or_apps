@@ -1,0 +1,141 @@
+Cities are replacing diesel buses with battery-electric ones. For the passengers the bus looks the same, but for the planners almost everything changes. A diesel bus can run all day on one tank and refuel in minutes. An electric bus has a limited range, takes a long time to recharge, needs dedicated chargers, and buys its energy at prices that vary through the day. Perumal, Lusby and Larsen, reviewing the field in 2022, describe the scheduling of electric vehicles as a fast-growing area of research and conclude that classical bus planning problems need to be adjusted for exactly these constraints.
+
+This lecture shows how. We start from the classical vehicle scheduling problem, which is easy, add battery range, which makes it hard, and then turn to the charging schedule, which is a linear program priced by the electricity market.
+
+## The planning process
+
+Bus planning is usually split into stages by time horizon, and electrification touches all of them.
+
+| Stage | Decisions | Electric-specific questions |
+| --- | --- | --- |
+| Strategic (years) | fleet size and mix, depots | battery size, where to install chargers, grid connection capacity |
+| Tactical (months) | timetable, **vehicle scheduling**, crew scheduling | which trips one battery charge can cover, when and where to recharge |
+| Operational (days, hours) | dispatching, disruptions | **charging schedules**, energy prices, reacting to higher-than-planned consumption |
+
+The two bolded problems are the core of this lecture. They sit in the middle of a chain: vehicle schedules depend on where chargers are, crew schedules depend on vehicle schedules, and charging schedules depend on both.
+
+## Vehicle scheduling
+
+The timetable fixes a set of **trips**: each trip leaves one terminal at a set time and arrives at another. A **vehicle schedule** (or *block*) is a sequence of trips that one bus can operate in turn. The vehicle scheduling problem is to cover every trip with as few buses as possible, and then with the least dead running.
+
+<Definition name="Compatible trips">
+Trip $j$ can follow trip $i$ on the same bus if
+$$
+\text{arr}_i + \text{layover} + \text{deadhead}(\text{end}_i, \text{start}_j) \le \text{dep}_j ,
+$$
+where the **deadhead** is the empty running time from the terminal where $i$ ends to the terminal where $j$ starts. Compatibility defines a directed acyclic graph on the trips.
+</Definition>
+
+A vehicle schedule is a path in this graph, and a fleet plan is a set of paths that covers every trip exactly once.
+
+<Result name="Minimum fleet">
+The minimum number of buses equals $n - \nu$, where $n$ is the number of trips and $\nu$ is the size of a maximum matching in the bipartite graph that joins each trip $i$ (on the left) to each trip $j$ that can follow it (on the right). Each matched pair $(i, j)$ means "the bus that runs $i$ runs $j$ next", and each such link saves one bus.
+</Result>
+
+This is a classical result — it goes back to Dantzig and Fulkerson's 1954 study of scheduling oil tankers to a fixed timetable — and it means the single-depot problem is solvable in polynomial time. Adding costs for deadheading and idle time keeps it polynomial: the problem becomes a **minimum-cost flow** from a depot source, through the trips, to a depot sink, with one unit of flow per bus. As in the transportation lecture, the network structure gives integer solutions for free.
+
+Easy cases end quickly, though. With several depots, each bus must return to the depot it left, and the multi-depot problem is NP-hard.
+
+## Electric vehicle scheduling
+
+Battery range breaks the flow structure. A path in the compatibility graph is now feasible only if the bus never runs out of energy along it, and that depends on the whole sequence of trips, not just on consecutive pairs. Adding a limit like this — on route length, duration or energy — makes even the single-depot problem NP-hard.
+
+### State of charge
+
+Let $q_b(t)$ be the energy in bus $b$'s battery. Each trip and deadhead consumes energy, and the battery must stay within limits:
+$$
+q_{\min} \le q_b(t) \le q_{\max} .
+$$
+The lower limit is usually well above zero, to leave a reserve and to protect the battery. Energy is restored by charging, in one of two main ways:
+
+- **Depot charging.** Buses plug in at the depot, mostly overnight and possibly during a midday lull. Chargers are relatively cheap, but a bus must leave service to recharge.
+- **Opportunity charging.** High-power chargers at terminals top up the battery during layovers. Buses can stay in service longer, but each charger is expensive and must be shared.
+
+Charging takes time and is not linear: batteries charge quickly when nearly empty and slow down as they fill. Models either restrict charging to the near-linear range or approximate the curve piecewise linearly.
+
+### Formulation
+
+The standard approach is the one used for airline crews: **set partitioning** over feasible schedules. Let $\Omega$ be the set of feasible electric vehicle schedules — trip sequences, with charging stops inserted, that respect timing and state of charge. With $c_\omega$ the cost of schedule $\omega$ and $a_{i\omega} = 1$ if it covers trip $i$,
+$$
+\min \sum_{\omega \in \Omega} c_\omega \lambda_\omega
+\quad \text{s.t.} \quad
+\sum_{\omega} a_{i\omega} \lambda_\omega = 1 \;\; \text{for every trip } i, \qquad \lambda_\omega \in \{0, 1\}.
+$$
+The fixed cost of a bus is included in each $c_\omega$, so the model minimizes fleet size first and operating cost second.
+
+The set $\Omega$ is far too large to enumerate, so it is generated on demand by **column generation**, exactly as in the crew scheduling lecture. The pricing problem is a **resource-constrained shortest path** in the compatibility graph, and the battery's state of charge is the resource. Charger capacity adds coupling constraints — no more buses at a charger than it has plugs at any moment — which enter the master problem.
+
+<Example name="Range changes the fleet">
+
+Ten trips run between terminals A and B, with a morning peak and an evening peak. Times are in minutes after 06:00. Every trip takes 60 minutes and uses 50 kWh. Deadheading between A and B takes 25 minutes, and the minimum layover is 10 minutes.
+
+| Trip | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Route | A→B | B→A | A→B | B→A | A→B | A→B | B→A | A→B | B→A | B→A |
+| Departs | 0 | 70 | 30 | 100 | 60 | 360 | 430 | 390 | 460 | 400 |
+
+All results below were computed exactly, by maximum matching and by set partitioning over every feasible schedule.
+
+- **Diesel.** Three buses are needed: for example $\{1, 2, 6, 7\}$, $\{3, 4, 8, 9\}$ and $\{5, 10\}$. Three is also the peak number of trips running at once, so no plan can do better.
+- **Electric, no charging during the day.** With 110 kWh usable per charge (and ignoring the energy used for deadheading), a bus can run only two trips. Five buses are needed.
+- **Electric, with a midday depot charge.** The depot is 15 minutes from either terminal, and a full recharge takes 60 minutes. A bus with a gap of at least 90 minutes between trips can go to the depot, charge and return. The midday lull allows exactly this, and the fleet is back to three, with the same schedules as diesel.
+
+</Example>
+
+The example shows why charging infrastructure and vehicle scheduling are planned together. The same timetable needs five buses or three depending on whether the schedule can fit in a charge, and the answer depends on the depot's location and the chargers' power as much as on the battery.
+
+## Charging schedules
+
+Once vehicle schedules are fixed, each bus is at the depot during known windows and needs a known amount of energy before its next departure. The remaining decision is **when to charge, and at what power**.
+
+Let $p_{bt} \ge 0$ be the charging power of bus $b$ in period $t$ (constant over a period of length $\Delta$), $\pi_t$ the electricity price, and $E_b$ the energy bus $b$ needs. The time-indexed model is a linear program:
+$$
+\begin{aligned}
+\min \quad & \sum_{b} \sum_{t} \pi_t \, \Delta \, p_{bt} \\
+\text{s.t.} \quad & \textstyle\sum_{t} \Delta \, p_{bt} = E_b && \text{for every bus } b \quad \text{(energy needed)} \\
+& 0 \le p_{bt} \le \bar P \;\; \text{if } b \text{ is plugged in during } t, \text{ else } p_{bt} = 0 && \text{(charger power)} \\
+& \textstyle\sum_{b} p_{bt} \le G && \text{for every period } t \quad \text{(grid connection)} .
+\end{aligned}
+$$
+The constraints mirror the transportation problem: buses demand energy, time periods supply it, prices are the costs, and the grid connection limits how much each period can supply.
+
+Real deployments add a few features:
+
+- **Demand charges.** Many tariffs bill the highest power drawn in a month as well as the energy used. Adding a variable $z \ge \sum_b p_{bt}$ for all $t$ and a cost per kW on $z$ keeps the model linear.
+- **Battery health.** Keeping batteries at high charge for long periods, or charging at high power, accelerates wear. Models penalize these, or limit charging to a target state of charge.
+- **Integer decisions.** Assigning buses to a limited number of chargers, or plugs that charge one bus at a time, makes the problem a MIP.
+
+<Example name="Overnight depot charging">
+
+Three buses return to the depot overnight. Electricity costs 0.20 per kWh from 22:00, 0.15 from 23:00, 0.10 from midnight to 05:00 and 0.18 from 05:00. Each charger delivers up to 60 kW, and the depot's grid connection allows 100 kW in total.
+
+| Bus | Plugged in | Energy needed |
+| --- | --- | --- |
+| 1 | 22:00–05:00 | 180 kWh |
+| 2 | 23:00–06:00 | 150 kWh |
+| 3 | 00:00–05:00 | 240 kWh |
+
+**Uncontrolled charging** — every bus charges at full power from the moment it arrives — costs 69.00. It also draws 180 kW at midnight, which the grid connection does not allow.
+
+**Optimal charging**, from the LP, costs 60.50. The depot's total load in each hour is:
+
+| Hour from | 22 | 23 | 00 | 01 | 02 | 03 | 04 | 05 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Load (kW) | 0 | 70 | 100 | 100 | 100 | 100 | 100 | 0 |
+
+The five cheap hours can supply at most $5 \times 100 = 500$ kWh, but the buses need 570 kWh. The extra 70 kWh is bought at 23:00 at 0.15, the cheapest remaining hour; buses 1 and 2 are plugged in then. (How the load splits between buses is not unique; the profile is.)
+
+**Reading the dual.** The shadow price of the grid limit is 0.05 per kW in each of the five cheap hours: an extra kW of connection in one of those hours lets one more kWh move from 23:00 to a 0.10 hour. Raising the connection to 110 kW saves $10 \times 5 \times 0.05 = 2.50$, and re-solving confirms a cost of 58.00. The shadow price of each bus's energy requirement is 0.15 per kWh: the marginal kWh is bought at 23:00. These are the numbers to compare against the cost of a bigger grid connection or an extra kWh of battery.
+
+</Example>
+
+Without the grid limit, the optimum would charge only in the cheapest hours, for 57.00 — but with a peak load of 180 kW. Coordinated charging therefore saves money twice: on energy, and by keeping within a smaller, cheaper grid connection.
+
+## Extensions
+
+- **Integrated planning.** Vehicle and crew schedules are traditionally planned in sequence. With electric buses the charging stops constrain both, and integrated vehicle and crew scheduling is an active research area; Perumal, Lusby and Larsen identify integrated planning as crucial.
+- **Charger location.** Where to install terminal chargers is a facility location problem, but its value depends on the vehicle schedules it enables, which leads to two-level models.
+- **Uncertain consumption.** Energy use per trip varies with temperature, heating or air conditioning, traffic and passenger load. Robust and stochastic models protect against a bus running short, much as safety stock protects against stockouts.
+- **The grid as a partner.** A depot full of batteries is a flexible load. Charging can respond to prices or grid signals, connecting this lecture to unit commitment.
+
+Further reading: J. Perumal, R. Lusby and J. Larsen, "Electric bus planning & scheduling: A review of related problems and methodologies", *European Journal of Operational Research* 301(2), 2022. For classical vehicle scheduling, see S. Bunte and N. Kliewer, "An overview on vehicle scheduling models", *Public Transport* 1(4), 2009.
